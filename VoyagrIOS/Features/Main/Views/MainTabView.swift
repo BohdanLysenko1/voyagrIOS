@@ -2,66 +2,32 @@ import SwiftUI
 
 struct MainTabView: View {
 
-    @Environment(AppContainer.self) private var container
-    @State private var showSignOutError = false
-    @State private var signOutErrorMessage = ""
-
     var body: some View {
         TabView {
-            HomeTab()
+            TripsView()
                 .tabItem {
-                    Label("Home", systemImage: "house")
+                    Label("Trips", systemImage: "airplane")
                 }
 
-            ProfileTab(onSignOut: signOut)
+            EventsView()
                 .tabItem {
-                    Label("Profile", systemImage: "person")
+                    Label("Events", systemImage: "star")
                 }
-        }
-        .alert("Sign Out Failed", isPresented: $showSignOutError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(signOutErrorMessage)
-        }
-    }
 
-    private func signOut() {
-        Task {
-            do {
-                try await container.authService.signOut()
-            } catch {
-                signOutErrorMessage = error.localizedDescription
-                showSignOutError = true
-            }
-        }
-    }
-}
-
-// MARK: - Tab Views
-
-private struct HomeTab: View {
-    var body: some View {
-        NavigationStack {
-            Text("Welcome to Voyagr")
-                .navigationTitle("Home")
-        }
-    }
-}
-
-private struct ProfileTab: View {
-    let onSignOut: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            VStack {
-                Spacer()
-                Button("Sign Out", role: .destructive) {
-                    onSignOut()
+            CalendarView()
+                .tabItem {
+                    Label("Calendar", systemImage: "calendar")
                 }
-                .buttonStyle(.bordered)
-                Spacer()
-            }
-            .navigationTitle("Profile")
+
+            TemplatesView()
+                .tabItem {
+                    Label("Templates", systemImage: "doc.on.doc")
+                }
+
+            SettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
         }
     }
 }
