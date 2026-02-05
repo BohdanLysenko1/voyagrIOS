@@ -151,40 +151,6 @@ struct EventFormView: View {
     }
 }
 
-// MARK: - EventCategory Display
-
-extension EventCategory {
-    var displayName: String {
-        switch self {
-        case .general: return "General"
-        case .meeting: return "Meeting"
-        case .social: return "Social"
-        case .entertainment: return "Entertainment"
-        case .sports: return "Sports"
-        case .health: return "Health"
-        case .education: return "Education"
-        case .work: return "Work"
-        case .travel: return "Travel"
-        case .other: return "Other"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .general: return "star"
-        case .meeting: return "person.2"
-        case .social: return "party.popper"
-        case .entertainment: return "film"
-        case .sports: return "figure.run"
-        case .health: return "heart"
-        case .education: return "book"
-        case .work: return "briefcase"
-        case .travel: return "airplane"
-        case .other: return "ellipsis.circle"
-        }
-    }
-}
-
 #Preview("New Event") {
     EventFormView(
         viewModel: EventFormViewModel(

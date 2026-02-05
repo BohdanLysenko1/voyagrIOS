@@ -15,23 +15,6 @@ struct CategoryBadge: View {
     }
 }
 
-extension EventCategory {
-    var color: Color {
-        switch self {
-        case .general: return .blue
-        case .meeting: return .purple
-        case .social: return .pink
-        case .entertainment: return .orange
-        case .sports: return .green
-        case .health: return .red
-        case .education: return .indigo
-        case .work: return .gray
-        case .travel: return .cyan
-        case .other: return .secondary
-        }
-    }
-}
-
 #Preview {
     HStack {
         CategoryBadge(category: .meeting)

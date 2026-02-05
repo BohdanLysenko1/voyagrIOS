@@ -6,6 +6,10 @@ struct CalendarView: View {
     @State private var selectedDate = Date()
     @State private var isLoading = true
     @State private var error: Error?
+    @State private var showTrips = true
+    @State private var showEvents = true
+    @State private var selectedTripStatus: TripStatus?
+    @State private var selectedEventCategory: EventCategory?
 
     private var tripService: TripServiceProtocol {
         container.tripService
@@ -40,11 +44,7 @@ struct CalendarView: View {
                     let (trips, events) = itemsForSelectedDate
                     if trips.isEmpty && events.isEmpty {
                         Spacer()
-                        ContentUnavailableView(
-                            "Nothing Scheduled",
-                            systemImage: "calendar.badge.clock",
-                            description: Text("No trips or events on this date")
-                        )
+                        emptyStateView
                         Spacer()
                     } else {
                         itemsList(trips: trips, events: events)
@@ -52,6 +52,11 @@ struct CalendarView: View {
                 }
             }
             .navigationTitle("Calendar")
+            .toolbar {
+                ToolbarItem(placement: .secondaryAction) {
+                    filterMenu
+                }
+            }
             .navigationDestination(for: TripDestination.self) { destination in
                 TripDetailView(tripId: destination.id)
             }
@@ -61,6 +66,119 @@ struct CalendarView: View {
         }
         .task {
             await loadData()
+        }
+    }
+
+    // MARK: - Filter Menu
+
+    private var hasActiveFilters: Bool {
+        !showTrips || !showEvents || selectedTripStatus != nil || selectedEventCategory != nil
+    }
+
+    private var emptyStateView: some View {
+        Group {
+            if hasActiveFilters {
+                ContentUnavailableView(
+                    "No Matches",
+                    systemImage: "line.3.horizontal.decrease.circle",
+                    description: Text("Try adjusting your filters")
+                )
+            } else {
+                ContentUnavailableView(
+                    "Nothing Scheduled",
+                    systemImage: "calendar.badge.clock",
+                    description: Text("No trips or events on this date")
+                )
+            }
+        }
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            Section("Show") {
+                Toggle("Trips", isOn: Binding(
+                    get: { showTrips },
+                    set: { newValue in
+                        showTrips = newValue
+                        if !newValue { selectedTripStatus = nil }
+                    }
+                ))
+                Toggle("Events", isOn: Binding(
+                    get: { showEvents },
+                    set: { newValue in
+                        showEvents = newValue
+                        if !newValue { selectedEventCategory = nil }
+                    }
+                ))
+            }
+
+            if showTrips {
+                Section("Trip Status") {
+                    Button {
+                        selectedTripStatus = nil
+                    } label: {
+                        HStack {
+                            Text("All Statuses")
+                            if selectedTripStatus == nil {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+
+                    ForEach(TripStatus.allCases, id: \.self) { status in
+                        Button {
+                            selectedTripStatus = status
+                        } label: {
+                            HStack {
+                                Text(status.displayName)
+                                if selectedTripStatus == status {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if showEvents {
+                Section("Event Category") {
+                    Button {
+                        selectedEventCategory = nil
+                    } label: {
+                        HStack {
+                            Text("All Categories")
+                            if selectedEventCategory == nil {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+
+                    ForEach(EventCategory.allCases, id: \.self) { category in
+                        Button {
+                            selectedEventCategory = category
+                        } label: {
+                            HStack {
+                                Label(category.displayName, systemImage: category.icon)
+                                if selectedEventCategory == category {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Divider()
+
+            Button("Reset Filters") {
+                showTrips = true
+                showEvents = true
+                selectedTripStatus = nil
+                selectedEventCategory = nil
+            }
+            .disabled(!hasActiveFilters)
+        } label: {
+            Label("Filter", systemImage: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
         }
     }
 
@@ -105,15 +223,31 @@ struct CalendarView: View {
     private var itemsForSelectedDate: (trips: [Trip], events: [Event]) {
         let calendar = Calendar.current
 
-        let trips = tripService.trips.filter { trip in
-            let startOfDay = calendar.startOfDay(for: selectedDate)
-            let tripStart = calendar.startOfDay(for: trip.startDate)
-            let tripEnd = calendar.startOfDay(for: trip.endDate)
-            return startOfDay >= tripStart && startOfDay <= tripEnd
+        var trips: [Trip] = []
+        if showTrips {
+            trips = tripService.trips.filter { trip in
+                let startOfDay = calendar.startOfDay(for: selectedDate)
+                let tripStart = calendar.startOfDay(for: trip.startDate)
+                let tripEnd = calendar.startOfDay(for: trip.endDate)
+                let dateMatches = startOfDay >= tripStart && startOfDay <= tripEnd
+
+                if let statusFilter = selectedTripStatus {
+                    return dateMatches && trip.status == statusFilter
+                }
+                return dateMatches
+            }
         }
 
-        let events = eventService.events.filter { event in
-            calendar.isDate(event.date, inSameDayAs: selectedDate)
+        var events: [Event] = []
+        if showEvents {
+            events = eventService.events.filter { event in
+                let dateMatches = calendar.isDate(event.date, inSameDayAs: selectedDate)
+
+                if let categoryFilter = selectedEventCategory {
+                    return dateMatches && event.category == categoryFilter
+                }
+                return dateMatches
+            }
         }
 
         return (trips, events)

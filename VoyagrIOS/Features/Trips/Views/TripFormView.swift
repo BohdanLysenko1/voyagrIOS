@@ -135,20 +135,6 @@ struct TripFormView: View {
     }
 }
 
-// MARK: - TripStatus Display
-
-extension TripStatus {
-    var displayName: String {
-        switch self {
-        case .planning: return "Planning"
-        case .upcoming: return "Upcoming"
-        case .active: return "Active"
-        case .completed: return "Completed"
-        case .cancelled: return "Cancelled"
-        }
-    }
-}
-
 #Preview("New Trip") {
     TripFormView(
         viewModel: TripFormViewModel(
