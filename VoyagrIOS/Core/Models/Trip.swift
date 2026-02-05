@@ -12,7 +12,7 @@ struct Trip: Identifiable, Codable, Equatable, Sendable {
     let createdAt: Date
     var updatedAt: Date
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         name: String,
         destination: String,

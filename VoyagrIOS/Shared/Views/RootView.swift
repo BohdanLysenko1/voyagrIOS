@@ -10,21 +10,22 @@ struct RootView: View {
             if container.authService.isAuthenticated {
                 MainTabView()
             } else {
-                AuthView(viewModel: getOrCreateAuthViewModel())
+                authView
             }
         }
         .animation(.easeInOut, value: container.authService.isAuthenticated)
     }
 
-    private func getOrCreateAuthViewModel() -> AuthViewModel {
-        if let existing = authViewModel {
-            return existing
+    @ViewBuilder
+    private var authView: some View {
+        if let viewModel = authViewModel {
+            AuthView(viewModel: viewModel)
+        } else {
+            Color.clear
+                .onAppear {
+                    authViewModel = container.makeAuthViewModel()
+                }
         }
-        let newViewModel = container.makeAuthViewModel()
-        Task { @MainActor in
-            authViewModel = newViewModel
-        }
-        return newViewModel
     }
 }
 

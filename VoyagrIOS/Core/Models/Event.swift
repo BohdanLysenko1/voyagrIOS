@@ -12,7 +12,7 @@ struct Event: Identifiable, Codable, Equatable, Sendable {
     let createdAt: Date
     var updatedAt: Date
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         title: String,
         date: Date,
