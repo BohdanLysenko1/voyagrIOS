@@ -52,6 +52,12 @@ struct CalendarView: View {
                 }
             }
             .navigationTitle("Calendar")
+            .navigationDestination(for: TripDestination.self) { destination in
+                TripDetailView(tripId: destination.id)
+            }
+            .navigationDestination(for: EventDestination.self) { destination in
+                EventDetailView(eventId: destination.id)
+            }
         }
         .task {
             await loadData()
@@ -63,7 +69,9 @@ struct CalendarView: View {
             if !trips.isEmpty {
                 Section("Trips") {
                     ForEach(trips) { trip in
-                        CalendarTripRow(trip: trip)
+                        NavigationLink(value: TripDestination(id: trip.id)) {
+                            CalendarTripRow(trip: trip)
+                        }
                     }
                 }
             }
@@ -71,7 +79,9 @@ struct CalendarView: View {
             if !events.isEmpty {
                 Section("Events") {
                     ForEach(events) { event in
-                        CalendarEventRow(event: event)
+                        NavigationLink(value: EventDestination(id: event.id)) {
+                            CalendarEventRow(event: event)
+                        }
                     }
                 }
             }
@@ -80,11 +90,16 @@ struct CalendarView: View {
     }
 
     private func errorView(_ error: Error) -> some View {
-        ContentUnavailableView(
-            "Unable to Load",
-            systemImage: "exclamationmark.triangle",
-            description: Text(error.localizedDescription)
-        )
+        ContentUnavailableView {
+            Label("Unable to Load", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(error.localizedDescription)
+        } actions: {
+            Button("Retry") {
+                Task { await loadData() }
+            }
+            .buttonStyle(.bordered)
+        }
     }
 
     private var itemsForSelectedDate: (trips: [Trip], events: [Event]) {
@@ -118,6 +133,16 @@ struct CalendarView: View {
     }
 }
 
+// MARK: - Navigation Destinations
+
+private struct TripDestination: Hashable {
+    let id: UUID
+}
+
+private struct EventDestination: Hashable {
+    let id: UUID
+}
+
 // MARK: - Calendar Rows
 
 private struct CalendarTripRow: View {
@@ -127,13 +152,16 @@ private struct CalendarTripRow: View {
         HStack {
             Image(systemName: "airplane")
                 .foregroundStyle(.blue)
-            VStack(alignment: .leading) {
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(trip.name)
                     .font(.subheadline)
                 Text(trip.destination)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Spacer()
+            StatusBadge(status: trip.status)
         }
     }
 }
@@ -143,9 +171,10 @@ private struct CalendarEventRow: View {
 
     var body: some View {
         HStack {
-            Image(systemName: "star.fill")
-                .foregroundStyle(.orange)
-            VStack(alignment: .leading) {
+            Image(systemName: event.category.icon)
+                .foregroundStyle(event.category.color)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(event.title)
                     .font(.subheadline)
                 if !event.location.isEmpty {
@@ -153,6 +182,12 @@ private struct CalendarEventRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+            Spacer()
+            if !event.isAllDay {
+                Text(event.date.formatted(date: .omitted, time: .shortened))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

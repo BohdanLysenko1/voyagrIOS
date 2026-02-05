@@ -5,6 +5,7 @@ struct EventsView: View {
     @Environment(AppContainer.self) private var container
     @State private var isLoading = true
     @State private var error: Error?
+    @State private var showAddEvent = false
 
     private var eventService: EventServiceProtocol {
         container.eventService
@@ -24,18 +25,42 @@ struct EventsView: View {
                 }
             }
             .navigationTitle("Events")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showAddEvent = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showAddEvent) {
+                EventFormView(
+                    viewModel: EventFormViewModel(eventService: container.eventService)
+                )
+            }
         }
         .task {
             await loadEvents()
         }
     }
 
+    // MARK: - Views
+
     private var eventsList: some View {
         List {
             ForEach(eventService.events) { event in
-                EventRow(event: event)
+                NavigationLink(value: event.id) {
+                    EventRow(event: event)
+                }
             }
             .onDelete(perform: deleteEvents)
+        }
+        .navigationDestination(for: UUID.self) { eventId in
+            EventDetailView(eventId: eventId)
+        }
+        .refreshable {
+            await loadEvents()
         }
     }
 
@@ -43,20 +68,27 @@ struct EventsView: View {
         ContentUnavailableView(
             "No Events",
             systemImage: "star",
-            description: Text("Your scheduled events will appear here")
+            description: Text("Tap + to create your first event")
         )
     }
 
     private func errorView(_ error: Error) -> some View {
-        ContentUnavailableView(
-            "Unable to Load Events",
-            systemImage: "exclamationmark.triangle",
-            description: Text(error.localizedDescription)
-        )
+        ContentUnavailableView {
+            Label("Unable to Load Events", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(error.localizedDescription)
+        } actions: {
+            Button("Retry") {
+                Task { await loadEvents() }
+            }
+            .buttonStyle(.bordered)
+        }
     }
 
+    // MARK: - Actions
+
     private func loadEvents() async {
-        isLoading = true
+        isLoading = eventService.events.isEmpty
         error = nil
         do {
             try await eventService.loadEvents()
@@ -100,21 +132,28 @@ private struct EventRow: View {
     }()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(event.title)
                     .font(.headline)
                 Spacer()
                 CategoryBadge(category: event.category)
             }
+
             if !event.location.isEmpty {
-                Text(event.location)
+                Label(event.location, systemImage: "location")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .labelStyle(.titleOnly)
             }
-            Text(formattedDate)
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+
+            HStack {
+                Image(systemName: event.isAllDay ? "calendar" : "clock")
+                    .font(.caption)
+                Text(formattedDate)
+                    .font(.caption)
+            }
+            .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
     }
@@ -125,21 +164,6 @@ private struct EventRow: View {
         } else {
             return Self.dateTimeFormatter.string(from: event.date)
         }
-    }
-}
-
-// MARK: - Category Badge
-
-private struct CategoryBadge: View {
-    let category: EventCategory
-
-    var body: some View {
-        Text(category.rawValue.capitalized)
-            .font(.caption2)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
-            .background(Color.secondary.opacity(0.2))
-            .clipShape(Capsule())
     }
 }
 

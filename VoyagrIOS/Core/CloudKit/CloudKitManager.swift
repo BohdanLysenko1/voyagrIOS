@@ -5,17 +5,35 @@ actor CloudKitManager {
 
     static let shared = CloudKitManager()
 
-    private let container: CKContainer
-    private let database: CKDatabase
+    private let container: CKContainer?
+    private let database: CKDatabase?
+
+    private let containerIdentifier = "iCloud.com.voyagr.VoyagrIOS"
 
     private init() {
-        self.container = CKContainer(identifier: "iCloud.com.voyagr.VoyagrIOS")
-        self.database = container.privateCloudDatabase
+        // Safely initialize CloudKit - won't crash if not configured
+        if let _ = Bundle.main.object(forInfoDictionaryKey: "NSUbiquitousContainers") as? [String: Any] {
+            self.container = CKContainer(identifier: containerIdentifier)
+            self.database = container?.privateCloudDatabase
+        } else {
+            // CloudKit not configured in entitlements
+            self.container = nil
+            self.database = nil
+        }
+    }
+
+    // MARK: - Availability Check
+
+    var isAvailable: Bool {
+        container != nil && database != nil
     }
 
     // MARK: - Account Status
 
     func checkAccountStatus() async throws -> Bool {
+        guard let container else {
+            return false
+        }
         let status = try await container.accountStatus()
         return status == .available
     }
@@ -23,6 +41,10 @@ actor CloudKitManager {
     // MARK: - CRUD Operations
 
     func fetchAll<T: CloudKitRecordConvertible>(_ type: T.Type) async throws -> [T] {
+        guard let database else {
+            throw CloudKitError.notAuthenticated
+        }
+
         let recordType = T.recordType
         let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
 
@@ -47,6 +69,10 @@ actor CloudKitManager {
     }
 
     func fetch<T: CloudKitRecordConvertible>(_ type: T.Type, id: UUID) async throws -> T {
+        guard let database else {
+            throw CloudKitError.notAuthenticated
+        }
+
         let recordID = CKRecord.ID(recordName: id.uuidString)
         do {
             let record = try await database.record(for: recordID)
@@ -62,6 +88,10 @@ actor CloudKitManager {
     }
 
     func save<T: CloudKitRecordConvertible>(_ item: T) async throws -> T {
+        guard let database else {
+            throw CloudKitError.notAuthenticated
+        }
+
         let record = item.toRecord()
         do {
             let savedRecord = try await database.save(record)
@@ -75,6 +105,10 @@ actor CloudKitManager {
     }
 
     func delete<T: CloudKitRecordConvertible>(_ type: T.Type, id: UUID) async throws {
+        guard let database else {
+            throw CloudKitError.notAuthenticated
+        }
+
         let recordID = CKRecord.ID(recordName: id.uuidString)
         do {
             try await database.deleteRecord(withID: recordID)
@@ -89,6 +123,10 @@ actor CloudKitManager {
     // MARK: - Batch Operations
 
     func saveAll<T: CloudKitRecordConvertible>(_ items: [T]) async throws {
+        guard let database else {
+            throw CloudKitError.notAuthenticated
+        }
+
         guard !items.isEmpty else { return }
 
         let records = items.map { $0.toRecord() }

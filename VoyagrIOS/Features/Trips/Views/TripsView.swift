@@ -5,6 +5,7 @@ struct TripsView: View {
     @Environment(AppContainer.self) private var container
     @State private var isLoading = true
     @State private var error: Error?
+    @State private var showAddTrip = false
 
     private var tripService: TripServiceProtocol {
         container.tripService
@@ -24,18 +25,42 @@ struct TripsView: View {
                 }
             }
             .navigationTitle("Trips")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showAddTrip = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showAddTrip) {
+                TripFormView(
+                    viewModel: TripFormViewModel(tripService: container.tripService)
+                )
+            }
         }
         .task {
             await loadTrips()
         }
     }
 
+    // MARK: - Views
+
     private var tripsList: some View {
         List {
             ForEach(tripService.trips) { trip in
-                TripRow(trip: trip)
+                NavigationLink(value: trip.id) {
+                    TripRow(trip: trip)
+                }
             }
             .onDelete(perform: deleteTrips)
+        }
+        .navigationDestination(for: UUID.self) { tripId in
+            TripDetailView(tripId: tripId)
+        }
+        .refreshable {
+            await loadTrips()
         }
     }
 
@@ -43,20 +68,27 @@ struct TripsView: View {
         ContentUnavailableView(
             "No Trips Yet",
             systemImage: "airplane",
-            description: Text("Your upcoming trips will appear here")
+            description: Text("Tap + to plan your first trip")
         )
     }
 
     private func errorView(_ error: Error) -> some View {
-        ContentUnavailableView(
-            "Unable to Load Trips",
-            systemImage: "exclamationmark.triangle",
-            description: Text(error.localizedDescription)
-        )
+        ContentUnavailableView {
+            Label("Unable to Load Trips", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(error.localizedDescription)
+        } actions: {
+            Button("Retry") {
+                Task { await loadTrips() }
+            }
+            .buttonStyle(.bordered)
+        }
     }
 
+    // MARK: - Actions
+
     private func loadTrips() async {
-        isLoading = true
+        isLoading = tripService.trips.isEmpty
         error = nil
         do {
             try await tripService.loadTrips()
@@ -92,12 +124,18 @@ private struct TripRow: View {
     }()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(trip.name)
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(trip.name)
+                    .font(.headline)
+                Spacer()
+                StatusBadge(status: trip.status)
+            }
+
             Text(trip.destination)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+
             Text(dateRange)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
@@ -108,7 +146,7 @@ private struct TripRow: View {
     private var dateRange: String {
         let start = Self.dateFormatter.string(from: trip.startDate)
         let end = Self.dateFormatter.string(from: trip.endDate)
-        return "\(start) - \(end)"
+        return "\(start) – \(end)"
     }
 }
 
