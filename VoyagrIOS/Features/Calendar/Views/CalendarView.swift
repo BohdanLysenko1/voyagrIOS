@@ -8,6 +8,7 @@ struct CalendarView: View {
     @State private var error: Error?
     @State private var showTrips = true
     @State private var showEvents = true
+    @State private var showTasks = true
     @State private var selectedTripStatus: TripStatus?
     @State private var selectedEventCategory: EventCategory?
 
@@ -17,6 +18,10 @@ struct CalendarView: View {
 
     private var eventService: EventServiceProtocol {
         container.eventService
+    }
+
+    private var dayPlannerService: DayPlannerServiceProtocol {
+        container.dayPlannerService
     }
 
     var body: some View {
@@ -41,13 +46,13 @@ struct CalendarView: View {
                     errorView(error)
                     Spacer()
                 } else {
-                    let (trips, events) = itemsForSelectedDate
-                    if trips.isEmpty && events.isEmpty {
+                    let (trips, events, tasks) = itemsForSelectedDate
+                    if trips.isEmpty && events.isEmpty && tasks.isEmpty {
                         Spacer()
                         emptyStateView
                         Spacer()
                     } else {
-                        itemsList(trips: trips, events: events)
+                        itemsList(trips: trips, events: events, tasks: tasks)
                     }
                 }
             }
@@ -72,7 +77,15 @@ struct CalendarView: View {
     // MARK: - Filter Menu
 
     private var hasActiveFilters: Bool {
-        !showTrips || !showEvents || selectedTripStatus != nil || selectedEventCategory != nil
+        !showTrips || !showEvents || !showTasks || selectedTripStatus != nil || selectedEventCategory != nil
+    }
+
+    private func resetFilters() {
+        showTrips = true
+        showEvents = true
+        showTasks = true
+        selectedTripStatus = nil
+        selectedEventCategory = nil
     }
 
     private var emptyStateView: some View {
@@ -92,13 +105,8 @@ struct CalendarView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Button("Reset Filters") {
-                    showTrips = true
-                    showEvents = true
-                    selectedTripStatus = nil
-                    selectedEventCategory = nil
-                }
-                .buttonStyle(.bordered)
+                Button("Reset Filters", action: resetFilters)
+                    .buttonStyle(.bordered)
             } else {
                 Image(systemName: "calendar.badge.clock")
                     .font(.system(size: 50))
@@ -109,7 +117,7 @@ struct CalendarView: View {
                         .font(.headline)
                         .fontWeight(.semibold)
 
-                    Text("No trips or events on this date")
+                    Text("No trips, events, or tasks on this date")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -135,6 +143,7 @@ struct CalendarView: View {
                         if !newValue { selectedEventCategory = nil }
                     }
                 ))
+                Toggle("Daily Tasks", isOn: $showTasks)
             }
 
             if showTrips {
@@ -195,19 +204,14 @@ struct CalendarView: View {
 
             Divider()
 
-            Button("Reset Filters") {
-                showTrips = true
-                showEvents = true
-                selectedTripStatus = nil
-                selectedEventCategory = nil
-            }
-            .disabled(!hasActiveFilters)
+            Button("Reset Filters", action: resetFilters)
+                .disabled(!hasActiveFilters)
         } label: {
             Label("Filter", systemImage: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
         }
     }
 
-    private func itemsList(trips: [Trip], events: [Event]) -> some View {
+    private func itemsList(trips: [Trip], events: [Event], tasks: [DailyTask]) -> some View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 if !trips.isEmpty {
@@ -228,6 +232,14 @@ struct CalendarView: View {
                                 EventCard(event: event, style: .compact)
                             }
                             .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if !tasks.isEmpty {
+                    sectionView(title: "Daily Tasks", icon: "checkmark.circle", gradient: AppTheme.dayPlannerGradient) {
+                        ForEach(tasks) { task in
+                            CalendarTaskRow(task: task, service: dayPlannerService)
                         }
                     }
                 }
@@ -280,7 +292,7 @@ struct CalendarView: View {
         }
     }
 
-    private var itemsForSelectedDate: (trips: [Trip], events: [Event]) {
+    private var itemsForSelectedDate: (trips: [Trip], events: [Event], tasks: [DailyTask]) {
         let calendar = Calendar.current
 
         var trips: [Trip] = []
@@ -310,7 +322,26 @@ struct CalendarView: View {
             }
         }
 
-        return (trips, events)
+        var tasks: [DailyTask] = []
+        if showTasks {
+            tasks = dayPlannerService.allTasks.filter { task in
+                calendar.isDate(task.date, inSameDayAs: selectedDate)
+            }.sorted { task1, task2 in
+                // Sort by time if both have time, otherwise scheduled first
+                switch (task1.startTime, task2.startTime) {
+                case let (time1?, time2?):
+                    return time1 < time2
+                case (_?, nil):
+                    return true
+                case (nil, _?):
+                    return false
+                case (nil, nil):
+                    return task1.title < task2.title
+                }
+            }
+        }
+
+        return (trips, events, tasks)
     }
 
     private func loadData() async {
@@ -319,7 +350,8 @@ struct CalendarView: View {
         do {
             async let tripsLoad: () = tripService.loadTrips()
             async let eventsLoad: () = eventService.loadEvents()
-            _ = try await (tripsLoad, eventsLoad)
+            async let tasksLoad: () = dayPlannerService.loadData()
+            _ = try await (tripsLoad, eventsLoad, tasksLoad)
         } catch {
             self.error = error
         }

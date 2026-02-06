@@ -19,9 +19,9 @@ struct MainTabView: View {
                     Label("Calendar", systemImage: "calendar")
                 }
 
-            TemplatesView()
+            DayPlannerView()
                 .tabItem {
-                    Label("Templates", systemImage: "doc.on.doc")
+                    Label("My Day", systemImage: "sun.max")
                 }
 
             SettingsView()

@@ -8,12 +8,16 @@ final class AppContainer {
 
     private let localTripRepository: TripRepositoryProtocol
     private let localEventRepository: EventRepositoryProtocol
+    private let localDailyTaskRepository: DailyTaskRepositoryProtocol
+    private let localDailyRoutineRepository: DailyRoutineRepositoryProtocol
 
     // MARK: - Services
 
     let authService: AuthServiceProtocol
     let tripService: TripServiceProtocol
     let eventService: EventServiceProtocol
+    let dayPlannerService: DayPlannerServiceProtocol
+    let notificationService: NotificationServiceProtocol
     let syncService: SyncService
 
     // MARK: - Init
@@ -22,16 +26,31 @@ final class AppContainer {
         authService: AuthServiceProtocol? = nil,
         tripRepository: TripRepositoryProtocol? = nil,
         eventRepository: EventRepositoryProtocol? = nil,
+        dailyTaskRepository: DailyTaskRepositoryProtocol? = nil,
+        dailyRoutineRepository: DailyRoutineRepositoryProtocol? = nil,
+        notificationService: NotificationService? = nil,
         syncService: SyncService? = nil
     ) {
         // Local repositories (source of truth)
         self.localTripRepository = tripRepository ?? LocalTripRepository()
         self.localEventRepository = eventRepository ?? LocalEventRepository()
+        self.localDailyTaskRepository = dailyTaskRepository ?? LocalDailyTaskRepository()
+        self.localDailyRoutineRepository = dailyRoutineRepository ?? LocalDailyRoutineRepository()
+
+        // Notification service
+        self.notificationService = notificationService ?? NotificationService()
 
         // Services
         self.authService = authService ?? MockAuthService()
         self.tripService = TripService(repository: localTripRepository)
-        self.eventService = EventService(repository: localEventRepository)
+        self.eventService = EventService(
+            repository: localEventRepository,
+            notificationService: self.notificationService
+        )
+        self.dayPlannerService = DayPlannerService(
+            taskRepository: localDailyTaskRepository,
+            routineRepository: localDailyRoutineRepository
+        )
 
         // Sync service
         self.syncService = syncService ?? SyncService(
@@ -44,5 +63,11 @@ final class AppContainer {
 
     func makeAuthViewModel() -> AuthViewModel {
         AuthViewModel(authService: authService)
+    }
+
+    // MARK: - App Lifecycle
+
+    func requestNotificationPermission() async {
+        _ = await notificationService.requestAuthorization()
     }
 }

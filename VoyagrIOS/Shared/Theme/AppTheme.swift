@@ -30,6 +30,12 @@ enum AppTheme {
         endPoint: .bottomTrailing
     )
 
+    static let dayPlannerGradient = LinearGradient(
+        colors: [.green, .mint],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
     // MARK: - Background Colors
 
     static let cardBackground = Color(.systemBackground)
