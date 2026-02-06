@@ -88,37 +88,286 @@ struct TripDetailView: View {
     // MARK: - Content
 
     private func tripContent(_ trip: Trip) -> some View {
-        List {
-            Section {
-                DetailRow(label: "Destination", value: trip.destination)
-                HStack {
-                    Text("Status")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    StatusBadge(status: trip.status)
+        ScrollView {
+            VStack(spacing: 16) {
+                // Hero Header
+                tripHeader(trip)
+
+                // Quick Actions Grid
+                quickActionsGrid(trip)
+
+                // Details Card
+                VStack(alignment: .leading, spacing: 0) {
+                    sectionHeader("Details", icon: "info.circle")
+
+                    VStack(spacing: 12) {
+                        detailRow(icon: "mappin.circle.fill", iconColor: .red, label: "Destination", value: trip.destination)
+
+                        Divider().padding(.leading, 44)
+
+                        HStack {
+                            Image(systemName: "flag.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.blue)
+                                .frame(width: 28)
+                            Text("Status")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            StatusBadge(status: trip.status, style: .prominent)
+                        }
+                    }
+                    .padding()
+                }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+
+                // Dates Card
+                VStack(alignment: .leading, spacing: 0) {
+                    sectionHeader("Dates", icon: "calendar")
+
+                    VStack(spacing: 12) {
+                        detailRow(icon: "airplane.departure", iconColor: .green, label: "Start", value: trip.startDate.formatted(date: .long, time: .omitted))
+
+                        Divider().padding(.leading, 44)
+
+                        detailRow(icon: "airplane.arrival", iconColor: .orange, label: "End", value: trip.endDate.formatted(date: .long, time: .omitted))
+
+                        Divider().padding(.leading, 44)
+
+                        detailRow(icon: "clock.fill", iconColor: .purple, label: "Duration", value: durationText(from: trip.startDate, to: trip.endDate))
+                    }
+                    .padding()
+                }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+
+                // Notes Card
+                if !trip.notes.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionHeader("Notes", icon: "note.text")
+
+                        Text(trip.notes)
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                    }
+                    .background(AppTheme.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+                }
+
+                // Info Card
+                VStack(alignment: .leading, spacing: 0) {
+                    sectionHeader("Info", icon: "clock.arrow.circlepath")
+
+                    VStack(spacing: 12) {
+                        detailRow(icon: "plus.circle.fill", iconColor: .gray, label: "Created", value: trip.createdAt.formatted(date: .abbreviated, time: .shortened))
+
+                        Divider().padding(.leading, 44)
+
+                        detailRow(icon: "pencil.circle.fill", iconColor: .gray, label: "Updated", value: trip.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                    }
+                    .padding()
+                }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+            }
+            .padding()
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+
+    // MARK: - Quick Actions Grid
+
+    private func quickActionsGrid(_ trip: Trip) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            // Budget
+            NavigationLink(value: TripSection.budget) {
+                QuickActionCard(
+                    icon: "creditcard.fill",
+                    title: "Budget",
+                    subtitle: budgetSubtitle(trip),
+                    progress: trip.budgetProgress,
+                    color: .green
+                )
+            }
+            .buttonStyle(.plain)
+
+            // Itinerary
+            NavigationLink(value: TripSection.itinerary) {
+                QuickActionCard(
+                    icon: "calendar.day.timeline.left",
+                    title: "Itinerary",
+                    subtitle: "\(trip.activities.count) activities",
+                    progress: nil,
+                    color: .blue
+                )
+            }
+            .buttonStyle(.plain)
+
+            // Packing
+            NavigationLink(value: TripSection.packing) {
+                QuickActionCard(
+                    icon: "bag.fill",
+                    title: "Packing",
+                    subtitle: packingSubtitle(trip),
+                    progress: trip.packingItems.isEmpty ? nil : trip.packingProgress,
+                    color: .orange
+                )
+            }
+            .buttonStyle(.plain)
+
+            // Checklist
+            NavigationLink(value: TripSection.checklist) {
+                QuickActionCard(
+                    icon: "checklist",
+                    title: "Checklist",
+                    subtitle: checklistSubtitle(trip),
+                    progress: trip.checklistItems.isEmpty ? nil : trip.checklistProgress,
+                    color: .purple
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .navigationDestination(for: TripSection.self) { section in
+            tripSectionView(section, trip: trip)
+        }
+    }
+
+    private func budgetSubtitle(_ trip: Trip) -> String {
+        if let budget = trip.budget {
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .currency
+            formatter.currencyCode = trip.currency
+            formatter.maximumFractionDigits = 0
+            return formatter.string(from: budget as NSNumber) ?? "\(trip.currency) \(budget)"
+        }
+        return "Not set"
+    }
+
+    private func packingSubtitle(_ trip: Trip) -> String {
+        if trip.packingItems.isEmpty {
+            return "No items"
+        }
+        let packed = trip.packingItems.filter { $0.isPacked }.count
+        return "\(packed)/\(trip.packingItems.count) packed"
+    }
+
+    private func checklistSubtitle(_ trip: Trip) -> String {
+        if trip.checklistItems.isEmpty {
+            return "No tasks"
+        }
+        let done = trip.checklistItems.filter { $0.isCompleted }.count
+        return "\(done)/\(trip.checklistItems.count) done"
+    }
+
+    @ViewBuilder
+    private func tripSectionView(_ section: TripSection, trip: Trip) -> some View {
+        let tripBinding = Binding<Trip>(
+            get: { container.tripService.trip(by: tripId) ?? trip },
+            set: { newTrip in
+                Task {
+                    try? await container.tripService.updateTrip(newTrip)
                 }
             }
+        )
 
-            Section("Dates") {
-                DetailRow(label: "Start", value: trip.startDate.formatted(date: .long, time: .omitted))
-                DetailRow(label: "End", value: trip.endDate.formatted(date: .long, time: .omitted))
-                DetailRow(label: "Duration", value: durationText(from: trip.startDate, to: trip.endDate))
+        switch section {
+        case .budget:
+            TripBudgetView(trip: tripBinding)
+        case .itinerary:
+            TripItineraryView(trip: tripBinding)
+        case .packing:
+            TripPackingView(trip: tripBinding)
+        case .checklist:
+            TripChecklistView(trip: tripBinding)
+        }
+    }
+
+    private func tripHeader(_ trip: Trip) -> some View {
+        VStack(spacing: 16) {
+            // Icon
+            Image(systemName: "airplane.circle.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(AppTheme.tripGradient)
+
+            // Title and destination
+            VStack(spacing: 4) {
+                Text(trip.name)
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text(trip.destination)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
 
-            if !trip.notes.isEmpty {
-                Section("Notes") {
-                    Text(trip.notes)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
+            // Days indicator
+            if trip.status == .upcoming || trip.status == .planning {
+                let days = Calendar.current.dateComponents([.day], from: Date(), to: trip.startDate).day ?? 0
+                if days > 0 {
+                    HStack(spacing: 4) {
+                        Text("\(days)")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.blue)
+                        Text("days until departure")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(.blue.opacity(0.1))
+                    .clipShape(Capsule())
                 }
+            } else if trip.status == .active {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 8, height: 8)
+                    Text("Currently on this trip")
+                        .font(.subheadline)
+                        .foregroundStyle(.green)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.green.opacity(0.1))
+                .clipShape(Capsule())
             }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .background(AppTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+    }
 
-            Section {
-                DetailRow(label: "Created", value: trip.createdAt.formatted(date: .abbreviated, time: .shortened))
-                DetailRow(label: "Updated", value: trip.updatedAt.formatted(date: .abbreviated, time: .shortened))
-            } header: {
-                Text("Info")
-            }
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.blue)
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground))
+    }
+
+    private func detailRow(icon: String, iconColor: Color, label: String, value: String) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundStyle(iconColor)
+                .frame(width: 28)
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .fontWeight(.medium)
         }
     }
 
@@ -147,6 +396,72 @@ struct TripDetailView: View {
             }
             isDeleting = false
         }
+    }
+}
+
+// MARK: - Trip Section
+
+enum TripSection: Hashable {
+    case budget
+    case itinerary
+    case packing
+    case checklist
+}
+
+// MARK: - Quick Action Card
+
+private struct QuickActionCard: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let progress: Double?
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(color.gradient)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let progress {
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color(.systemGray5))
+                            .frame(height: 6)
+
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(color.gradient)
+                            .frame(width: geometry.size.width * progress, height: 6)
+                    }
+                }
+                .frame(height: 6)
+            }
+        }
+        .padding()
+        .background(AppTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
     }
 }
 

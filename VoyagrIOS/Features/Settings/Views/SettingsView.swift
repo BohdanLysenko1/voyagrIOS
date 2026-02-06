@@ -13,14 +13,24 @@ struct SettingsView: View {
 
         NavigationStack {
             List {
+                // Cloud Section
                 Section {
-                    Toggle("iCloud Sync", isOn: $syncService.isSyncEnabled)
-                        .disabled(isCheckingCloud)
-                        .onChange(of: syncService.isSyncEnabled) { _, newValue in
-                            if newValue {
-                                checkCloudAvailability()
+                    HStack(spacing: 14) {
+                        Image(systemName: "icloud")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 32, height: 32)
+                            .background(Color.blue.gradient)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                        Toggle("iCloud Sync", isOn: $syncService.isSyncEnabled)
+                            .disabled(isCheckingCloud)
+                            .onChange(of: syncService.isSyncEnabled) { _, newValue in
+                                if newValue {
+                                    checkCloudAvailability()
+                                }
                             }
-                        }
+                    }
 
                     if syncService.isSyncEnabled {
                         HStack {
@@ -38,8 +48,15 @@ struct SettingsView: View {
                             }
                         }
 
-                        Button("Sync Now") {
+                        Button {
                             Task { await container.syncService.sync() }
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                                    .fontWeight(.medium)
+                                Spacer()
+                            }
                         }
                         .disabled(syncService.syncStatus == .syncing)
                     }
@@ -49,9 +66,27 @@ struct SettingsView: View {
                     Text("Sync your trips and events across all your devices using iCloud.")
                 }
 
+                // About Section
+                Section("About") {
+                    HStack {
+                        Label("Version", systemImage: "info.circle")
+                        Spacer()
+                        Text("1.0.0")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                // Account Section
                 Section {
-                    Button("Sign Out", role: .destructive) {
+                    Button(role: .destructive) {
                         signOut()
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                                .fontWeight(.medium)
+                            Spacer()
+                        }
                     }
                 }
             }

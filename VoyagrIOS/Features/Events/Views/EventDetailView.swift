@@ -88,46 +88,368 @@ struct EventDetailView: View {
     // MARK: - Content
 
     private func eventContent(_ event: Event) -> some View {
-        List {
-            Section {
-                HStack {
-                    Label(event.category.displayName, systemImage: event.category.icon)
-                    Spacer()
-                    CategoryBadge(category: event.category)
+        ScrollView {
+            VStack(spacing: 16) {
+                // Hero Header
+                eventHeader(event)
+
+                // Details Card
+                VStack(alignment: .leading, spacing: 0) {
+                    sectionHeader("Details", icon: "info.circle")
+
+                    VStack(spacing: 12) {
+                        HStack {
+                            Image(systemName: event.category.icon)
+                                .font(.system(size: 20))
+                                .foregroundStyle(event.category.color)
+                                .frame(width: 28)
+                            Text("Category")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            CategoryBadge(category: event.category, style: .prominent)
+                        }
+
+                        Divider().padding(.leading, 44)
+
+                        HStack {
+                            Image(systemName: event.priority.icon)
+                                .font(.system(size: 20))
+                                .foregroundStyle(priorityColor(event.priority))
+                                .frame(width: 28)
+                            Text("Priority")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(event.priority.displayName)
+                                .fontWeight(.medium)
+                                .foregroundStyle(priorityColor(event.priority))
+                        }
+
+                        if !event.location.isEmpty {
+                            Divider().padding(.leading, 44)
+                            detailRow(icon: "mappin.circle.fill", iconColor: .red, label: "Location", value: event.location)
+                        }
+
+                        if !event.address.isEmpty {
+                            Divider().padding(.leading, 44)
+                            detailRow(icon: "map.fill", iconColor: .orange, label: "Address", value: event.address)
+                        }
+                    }
+                    .padding()
                 }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+
+                // Date & Time Card
+                VStack(alignment: .leading, spacing: 0) {
+                    sectionHeader("Date & Time", icon: "calendar")
+
+                    VStack(spacing: 12) {
+                        if event.isAllDay {
+                            detailRow(icon: "calendar.circle.fill", iconColor: .blue, label: "Date", value: event.date.formatted(date: .long, time: .omitted))
+
+                            Divider().padding(.leading, 44)
+
+                            HStack {
+                                Image(systemName: "sun.max.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(.orange)
+                                    .frame(width: 28)
+                                Text("All Day")
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("Yes")
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.blue)
+                            }
+                        } else {
+                            detailRow(icon: "play.circle.fill", iconColor: .green, label: "Starts", value: event.date.formatted(date: .long, time: .shortened))
+
+                            if let endDate = event.endDate {
+                                Divider().padding(.leading, 44)
+
+                                detailRow(icon: "stop.circle.fill", iconColor: .red, label: "Ends", value: endDate.formatted(date: .long, time: .shortened))
+
+                                Divider().padding(.leading, 44)
+
+                                detailRow(icon: "clock.fill", iconColor: .purple, label: "Duration", value: durationText(from: event.date, to: endDate))
+                            }
+                        }
+
+                        // Recurrence
+                        if let rule = event.recurrenceRule {
+                            Divider().padding(.leading, 44)
+
+                            HStack {
+                                Image(systemName: "repeat")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(.blue)
+                                    .frame(width: 28)
+                                Text("Repeats")
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(rule.displayText)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.blue)
+                            }
+                        }
+                    }
+                    .padding()
+                }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+
+                // Reminders Card
+                if !event.reminders.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionHeader("Reminders", icon: "bell.fill")
+
+                        VStack(spacing: 12) {
+                            ForEach(event.reminders) { reminder in
+                                HStack {
+                                    Image(systemName: "bell.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(.orange)
+                                        .frame(width: 28)
+                                    Text(reminder.interval.displayName)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    if reminder.isEnabled {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(.green)
+                                    }
+                                }
+
+                                if reminder.id != event.reminders.last?.id {
+                                    Divider().padding(.leading, 44)
+                                }
+                            }
+                        }
+                        .padding()
+                    }
+                    .background(AppTheme.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+                }
+
+                // Links & Cost Card
+                if event.url != nil || event.cost != nil || !event.attachments.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionHeader("Links & Cost", icon: "link")
+
+                        VStack(spacing: 12) {
+                            if let url = event.url {
+                                HStack {
+                                    Image(systemName: "globe")
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(.blue)
+                                        .frame(width: 28)
+                                    Link(url.host ?? url.absoluteString, destination: url)
+                                        .font(.subheadline)
+                                    Spacer()
+                                    Image(systemName: "arrow.up.right.square")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            if let cost = event.cost {
+                                if event.url != nil {
+                                    Divider().padding(.leading, 44)
+                                }
+
+                                detailRow(icon: "creditcard.fill", iconColor: .green, label: "Cost", value: formatCost(cost, currency: event.currency))
+                            }
+
+                            ForEach(event.attachments) { attachment in
+                                Divider().padding(.leading, 44)
+
+                                HStack {
+                                    Image(systemName: attachment.type.icon)
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(.purple)
+                                        .frame(width: 28)
+                                    Text(attachment.name)
+                                        .font(.subheadline)
+                                    Spacer()
+                                    if let url = attachment.url {
+                                        Link(destination: url) {
+                                            Image(systemName: "arrow.up.right.square")
+                                                .foregroundStyle(.blue)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding()
+                    }
+                    .background(AppTheme.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+                }
+
+                // Notes Card
+                if !event.notes.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        sectionHeader("Notes", icon: "note.text")
+
+                        Text(event.notes)
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                    }
+                    .background(AppTheme.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+                }
+
+                // Info Card
+                VStack(alignment: .leading, spacing: 0) {
+                    sectionHeader("Info", icon: "clock.arrow.circlepath")
+
+                    VStack(spacing: 12) {
+                        detailRow(icon: "plus.circle.fill", iconColor: .gray, label: "Created", value: event.createdAt.formatted(date: .abbreviated, time: .shortened))
+
+                        Divider().padding(.leading, 44)
+
+                        detailRow(icon: "pencil.circle.fill", iconColor: .gray, label: "Updated", value: event.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                    }
+                    .padding()
+                }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+            }
+            .padding()
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private func priorityColor(_ priority: EventPriority) -> Color {
+        switch priority {
+        case .low: return .green
+        case .medium: return .blue
+        case .high: return .red
+        }
+    }
+
+    private func formatCost(_ cost: Decimal, currency: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currency
+        return formatter.string(from: cost as NSNumber) ?? "\(currency) \(cost)"
+    }
+
+    private func eventHeader(_ event: Event) -> some View {
+        VStack(spacing: 16) {
+            // Category icon
+            Image(systemName: event.category.icon)
+                .font(.system(size: 40, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 80, height: 80)
+                .background(event.category.color.gradient)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+
+            // Title
+            VStack(spacing: 4) {
+                Text(event.title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
 
                 if !event.location.isEmpty {
-                    Label(event.location, systemImage: "location")
-                }
-            }
-
-            Section("Date & Time") {
-                if event.isAllDay {
-                    DetailRow(label: "Date", value: event.date.formatted(date: .long, time: .omitted))
-                    DetailRow(label: "All Day", value: "Yes")
-                } else {
-                    DetailRow(label: "Starts", value: event.date.formatted(date: .long, time: .shortened))
-                    if let endDate = event.endDate {
-                        DetailRow(label: "Ends", value: endDate.formatted(date: .long, time: .shortened))
-                        DetailRow(label: "Duration", value: durationText(from: event.date, to: endDate))
-                    }
-                }
-            }
-
-            if !event.notes.isEmpty {
-                Section("Notes") {
-                    Text(event.notes)
-                        .font(.body)
+                    Label(event.location, systemImage: "location.fill")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Section {
-                DetailRow(label: "Created", value: event.createdAt.formatted(date: .abbreviated, time: .shortened))
-                DetailRow(label: "Updated", value: event.updatedAt.formatted(date: .abbreviated, time: .shortened))
-            } header: {
-                Text("Info")
+            // Time indicator
+            timeIndicatorView(for: event)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .background(AppTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+    }
+
+    @ViewBuilder
+    private func timeIndicatorView(for event: Event) -> some View {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(event.date) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(.red)
+                    .frame(width: 8, height: 8)
+                Text("Today")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.red)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.red.opacity(0.1))
+            .clipShape(Capsule())
+        } else if calendar.isDateInTomorrow(event.date) {
+            Text("Tomorrow")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.orange.opacity(0.1))
+                .clipShape(Capsule())
+        } else {
+            let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: event.date)).day ?? 0
+            if days > 0 {
+                HStack(spacing: 4) {
+                    Text("\(days)")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.blue)
+                    Text(days == 1 ? "day away" : "days away")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.blue.opacity(0.1))
+                .clipShape(Capsule())
+            } else if days < 0 {
+                Text("Past event")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color(.tertiarySystemBackground))
+                    .clipShape(Capsule())
+            }
+        }
+    }
+
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.purple)
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground))
+    }
+
+    private func detailRow(icon: String, iconColor: Color, label: String, value: String) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundStyle(iconColor)
+                .frame(width: 28)
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .fontWeight(.medium)
         }
     }
 

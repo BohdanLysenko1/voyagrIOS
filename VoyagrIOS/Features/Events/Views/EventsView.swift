@@ -108,14 +108,26 @@ struct EventsView: View {
     // MARK: - Views
 
     private var eventsList: some View {
-        List {
-            ForEach(filteredEvents) { event in
-                NavigationLink(value: event.id) {
-                    EventRow(event: event)
+        ScrollView {
+            LazyVStack(spacing: AppTheme.listSpacing) {
+                ForEach(filteredEvents) { event in
+                    NavigationLink(value: event.id) {
+                        EventCard(event: event)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            deleteEvent(event)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
             }
-            .onDelete(perform: deleteEvents)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationDestination(for: UUID.self) { eventId in
             EventDetailView(eventId: eventId)
         }
@@ -125,11 +137,33 @@ struct EventsView: View {
     }
 
     private var emptyView: some View {
-        ContentUnavailableView(
-            "No Events",
-            systemImage: "star",
-            description: Text("Tap + to create your first event")
-        )
+        VStack(spacing: 20) {
+            Image(systemName: "star.circle")
+                .font(.system(size: 70))
+                .foregroundStyle(AppTheme.eventGradient)
+
+            VStack(spacing: 8) {
+                Text("No Events")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text("Create events to track your activities!")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button {
+                showAddEvent = true
+            } label: {
+                Label("Create Event", systemImage: "plus")
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
     }
 
     @ViewBuilder
@@ -173,71 +207,13 @@ struct EventsView: View {
         isLoading = false
     }
 
-    private func deleteEvents(at offsets: IndexSet) {
-        let idsToDelete = offsets.map { filteredEvents[$0].id }
+    private func deleteEvent(_ event: Event) {
         Task {
-            for id in idsToDelete {
-                do {
-                    try await eventService.deleteEvent(by: id)
-                } catch {
-                    self.error = error
-                }
+            do {
+                try await eventService.deleteEvent(by: event.id)
+            } catch {
+                self.error = error
             }
-        }
-    }
-}
-
-// MARK: - Event Row
-
-private struct EventRow: View {
-    let event: Event
-
-    private static let dateTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
-    private static let dateOnlyFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(event.title)
-                    .font(.headline)
-                Spacer()
-                CategoryBadge(category: event.category)
-            }
-
-            if !event.location.isEmpty {
-                Label(event.location, systemImage: "location")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .labelStyle(.titleOnly)
-            }
-
-            HStack {
-                Image(systemName: event.isAllDay ? "calendar" : "clock")
-                    .font(.caption)
-                Text(formattedDate)
-                    .font(.caption)
-            }
-            .foregroundStyle(.tertiary)
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var formattedDate: String {
-        if event.isAllDay {
-            return Self.dateOnlyFormatter.string(from: event.date)
-        } else {
-            return Self.dateTimeFormatter.string(from: event.date)
         }
     }
 }

@@ -108,14 +108,26 @@ struct TripsView: View {
     // MARK: - Views
 
     private var tripsList: some View {
-        List {
-            ForEach(filteredTrips) { trip in
-                NavigationLink(value: trip.id) {
-                    TripRow(trip: trip)
+        ScrollView {
+            LazyVStack(spacing: AppTheme.listSpacing) {
+                ForEach(filteredTrips) { trip in
+                    NavigationLink(value: trip.id) {
+                        TripCard(trip: trip)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            deleteTrip(trip)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
             }
-            .onDelete(perform: deleteTrips)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationDestination(for: UUID.self) { tripId in
             TripDetailView(tripId: tripId)
         }
@@ -125,11 +137,33 @@ struct TripsView: View {
     }
 
     private var emptyView: some View {
-        ContentUnavailableView(
-            "No Trips Yet",
-            systemImage: "airplane",
-            description: Text("Tap + to plan your first trip")
-        )
+        VStack(spacing: 20) {
+            Image(systemName: "airplane.circle")
+                .font(.system(size: 70))
+                .foregroundStyle(AppTheme.tripGradient)
+
+            VStack(spacing: 8) {
+                Text("No Trips Yet")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text("Start planning your next adventure!")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button {
+                showAddTrip = true
+            } label: {
+                Label("Plan a Trip", systemImage: "plus")
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
     }
 
     @ViewBuilder
@@ -173,55 +207,14 @@ struct TripsView: View {
         isLoading = false
     }
 
-    private func deleteTrips(at offsets: IndexSet) {
-        let idsToDelete = offsets.map { filteredTrips[$0].id }
+    private func deleteTrip(_ trip: Trip) {
         Task {
-            for id in idsToDelete {
-                do {
-                    try await tripService.deleteTrip(by: id)
-                } catch {
-                    self.error = error
-                }
+            do {
+                try await tripService.deleteTrip(by: trip.id)
+            } catch {
+                self.error = error
             }
         }
-    }
-}
-
-// MARK: - Trip Row
-
-private struct TripRow: View {
-    let trip: Trip
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter
-    }()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(trip.name)
-                    .font(.headline)
-                Spacer()
-                StatusBadge(status: trip.status)
-            }
-
-            Text(trip.destination)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Text(dateRange)
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var dateRange: String {
-        let start = Self.dateFormatter.string(from: trip.startDate)
-        let end = Self.dateFormatter.string(from: trip.endDate)
-        return "\(start) – \(end)"
     }
 }
 

@@ -18,6 +18,7 @@ struct TripFormView: View {
                 statusSection
                 notesSection
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(viewModel.isEditing ? "Edit Trip" : "New Trip")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

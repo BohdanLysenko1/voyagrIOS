@@ -76,21 +76,46 @@ struct CalendarView: View {
     }
 
     private var emptyStateView: some View {
-        Group {
+        VStack(spacing: 16) {
             if hasActiveFilters {
-                ContentUnavailableView(
-                    "No Matches",
-                    systemImage: "line.3.horizontal.decrease.circle",
-                    description: Text("Try adjusting your filters")
-                )
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 50))
+                    .foregroundStyle(.secondary)
+
+                VStack(spacing: 6) {
+                    Text("No Matches")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+
+                    Text("Try adjusting your filters")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Button("Reset Filters") {
+                    showTrips = true
+                    showEvents = true
+                    selectedTripStatus = nil
+                    selectedEventCategory = nil
+                }
+                .buttonStyle(.bordered)
             } else {
-                ContentUnavailableView(
-                    "Nothing Scheduled",
-                    systemImage: "calendar.badge.clock",
-                    description: Text("No trips or events on this date")
-                )
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 50))
+                    .foregroundStyle(AppTheme.calendarGradient)
+
+                VStack(spacing: 6) {
+                    Text("Nothing Scheduled")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+
+                    Text("No trips or events on this date")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
+        .padding()
     }
 
     private var filterMenu: some View {
@@ -183,28 +208,63 @@ struct CalendarView: View {
     }
 
     private func itemsList(trips: [Trip], events: [Event]) -> some View {
-        List {
-            if !trips.isEmpty {
-                Section("Trips") {
-                    ForEach(trips) { trip in
-                        NavigationLink(value: TripDestination(id: trip.id)) {
-                            CalendarTripRow(trip: trip)
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                if !trips.isEmpty {
+                    sectionView(title: "Trips", icon: "airplane", gradient: AppTheme.tripGradient) {
+                        ForEach(trips) { trip in
+                            NavigationLink(value: TripDestination(id: trip.id)) {
+                                TripCard(trip: trip, style: .compact)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
+
+                if !events.isEmpty {
+                    sectionView(title: "Events", icon: "star", gradient: AppTheme.eventGradient) {
+                        ForEach(events) { event in
+                            NavigationLink(value: EventDestination(id: event.id)) {
+                                EventCard(event: event, style: .compact)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private func sectionView<Content: View>(
+        title: String,
+        icon: String,
+        gradient: LinearGradient,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(gradient)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
             }
 
-            if !events.isEmpty {
-                Section("Events") {
-                    ForEach(events) { event in
-                        NavigationLink(value: EventDestination(id: event.id)) {
-                            CalendarEventRow(event: event)
-                        }
-                    }
-                }
+            VStack(spacing: 10) {
+                content()
             }
         }
-        .listStyle(.insetGrouped)
     }
 
     private func errorView(_ error: Error) -> some View {
@@ -275,56 +335,6 @@ private struct TripDestination: Hashable {
 
 private struct EventDestination: Hashable {
     let id: UUID
-}
-
-// MARK: - Calendar Rows
-
-private struct CalendarTripRow: View {
-    let trip: Trip
-
-    var body: some View {
-        HStack {
-            Image(systemName: "airplane")
-                .foregroundStyle(.blue)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(trip.name)
-                    .font(.subheadline)
-                Text(trip.destination)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            StatusBadge(status: trip.status)
-        }
-    }
-}
-
-private struct CalendarEventRow: View {
-    let event: Event
-
-    var body: some View {
-        HStack {
-            Image(systemName: event.category.icon)
-                .foregroundStyle(event.category.color)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(event.title)
-                    .font(.subheadline)
-                if !event.location.isEmpty {
-                    Text(event.location)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if !event.isAllDay {
-                Text(event.date.formatted(date: .omitted, time: .shortened))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
 }
 
 #Preview {

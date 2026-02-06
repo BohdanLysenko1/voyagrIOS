@@ -11,9 +11,30 @@ final class EventFormViewModel {
     var endDate: Date?
     var hasEndDate: Bool = false
     var location: String = ""
+    var address: String = ""
     var notes: String = ""
     var category: EventCategory = .general
     var isAllDay: Bool = false
+    var priority: EventPriority = .medium
+
+    // Reminders
+    var reminders: [Reminder] = []
+
+    // Recurrence
+    var isRecurring: Bool = false
+    var recurrenceFrequency: RecurrenceFrequency = .weekly
+    var recurrenceInterval: Int = 1
+    var recurrenceEndDate: Date?
+    var hasRecurrenceEndDate: Bool = false
+    var selectedDaysOfWeek: Set<DayOfWeek> = []
+
+    // Links & Cost
+    var urlString: String = ""
+    var costString: String = ""
+    var currency: String = "USD"
+
+    // Attachments
+    var attachments: [Attachment] = []
 
     // MARK: - State
 
@@ -63,9 +84,30 @@ final class EventFormViewModel {
             self.endDate = event.endDate
             self.hasEndDate = event.endDate != nil
             self.location = event.location
+            self.address = event.address
             self.notes = event.notes
             self.category = event.category
             self.isAllDay = event.isAllDay
+            self.priority = event.priority
+            self.reminders = event.reminders
+            self.attachments = event.attachments
+            self.currency = event.currency
+
+            if let url = event.url {
+                self.urlString = url.absoluteString
+            }
+            if let cost = event.cost {
+                self.costString = "\(cost)"
+            }
+
+            if let rule = event.recurrenceRule {
+                self.isRecurring = true
+                self.recurrenceFrequency = rule.frequency
+                self.recurrenceInterval = rule.interval
+                self.recurrenceEndDate = rule.endDate
+                self.hasRecurrenceEndDate = rule.endDate != nil
+                self.selectedDaysOfWeek = rule.daysOfWeek ?? []
+            }
         }
     }
 
@@ -77,6 +119,16 @@ final class EventFormViewModel {
         isSaving = true
         error = nil
 
+        let recurrenceRule: RecurrenceRule? = isRecurring ? RecurrenceRule(
+            frequency: recurrenceFrequency,
+            interval: recurrenceInterval,
+            endDate: hasRecurrenceEndDate ? recurrenceEndDate : nil,
+            daysOfWeek: recurrenceFrequency == .weekly && !selectedDaysOfWeek.isEmpty ? selectedDaysOfWeek : nil
+        ) : nil
+
+        let url = URL(string: urlString)
+        let cost = Decimal(string: costString)
+
         do {
             if let existingEvent {
                 let updatedEvent = Event(
@@ -85,11 +137,20 @@ final class EventFormViewModel {
                     date: date,
                     endDate: hasEndDate ? endDate : nil,
                     location: location.trimmingCharacters(in: .whitespaces),
+                    address: address.trimmingCharacters(in: .whitespaces),
                     notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
                     category: category,
                     isAllDay: isAllDay,
                     createdAt: existingEvent.createdAt,
-                    updatedAt: Date()
+                    updatedAt: Date(),
+                    priority: priority,
+                    reminders: reminders,
+                    recurrenceRule: recurrenceRule,
+                    attachments: attachments,
+                    url: url,
+                    cost: cost,
+                    currency: currency,
+                    tripId: existingEvent.tripId
                 )
                 try await eventService.updateEvent(updatedEvent)
             } else {
@@ -98,9 +159,17 @@ final class EventFormViewModel {
                     date: date,
                     endDate: hasEndDate ? endDate : nil,
                     location: location.trimmingCharacters(in: .whitespaces),
+                    address: address.trimmingCharacters(in: .whitespaces),
                     notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
                     category: category,
-                    isAllDay: isAllDay
+                    isAllDay: isAllDay,
+                    priority: priority,
+                    reminders: reminders,
+                    recurrenceRule: recurrenceRule,
+                    attachments: attachments,
+                    url: url,
+                    cost: cost,
+                    currency: currency
                 )
                 try await eventService.createEvent(newEvent)
             }
@@ -114,5 +183,28 @@ final class EventFormViewModel {
 
     func clearError() {
         error = nil
+    }
+
+    // MARK: - Reminder Helpers
+
+    func addReminder(_ interval: ReminderInterval) {
+        guard !reminders.contains(where: { $0.interval == interval }) else { return }
+        reminders.append(Reminder(interval: interval))
+    }
+
+    func removeReminder(_ reminder: Reminder) {
+        reminders.removeAll { $0.id == reminder.id }
+    }
+
+    // MARK: - Attachment Helpers
+
+    func addLinkAttachment(name: String, urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        let attachment = Attachment(name: name, type: .link, url: url)
+        attachments.append(attachment)
+    }
+
+    func removeAttachment(_ attachment: Attachment) {
+        attachments.removeAll { $0.id == attachment.id }
     }
 }
