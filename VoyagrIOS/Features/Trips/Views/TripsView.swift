@@ -6,8 +6,12 @@ struct TripsView: View {
     @State private var isLoading = true
     @State private var error: Error?
     @State private var showAddTrip = false
+    @State private var editingTrip: Trip?
     @State private var searchText = ""
     @State private var selectedStatusFilter: TripStatus?
+    @State private var isSelectMode = false
+    @State private var selectedTrips: Set<UUID> = []
+    @State private var showDeleteConfirmation = false
 
     private var tripService: TripServiceProtocol {
         container.tripService
@@ -32,32 +36,63 @@ struct TripsView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView()
-                } else if let error {
-                    errorView(error)
-                } else if tripService.trips.isEmpty {
-                    emptyView
-                } else if filteredTrips.isEmpty {
-                    noResultsView
-                } else {
-                    tripsList
+            ZStack(alignment: .bottom) {
+                Group {
+                    if isLoading {
+                        ProgressView()
+                    } else if let error {
+                        errorView(error)
+                    } else if tripService.trips.isEmpty {
+                        emptyView
+                    } else if filteredTrips.isEmpty {
+                        noResultsView
+                    } else {
+                        tripsList
+                    }
+                }
+
+                if isSelectMode && !selectedTrips.isEmpty {
+                    deleteBar
                 }
             }
             .navigationTitle("Trips")
             .searchable(text: $searchText, prompt: "Search trips")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showAddTrip = true
-                    } label: {
-                        Image(systemName: "plus")
+                if isSelectMode {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Done") {
+                            withAnimation {
+                                isSelectMode = false
+                                selectedTrips.removeAll()
+                            }
+                        }
                     }
-                }
 
-                ToolbarItem(placement: .secondaryAction) {
-                    filterMenu
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(selectedTrips.count == filteredTrips.count ? "Deselect All" : "Select All") {
+                            if selectedTrips.count == filteredTrips.count {
+                                selectedTrips.removeAll()
+                            } else {
+                                selectedTrips = Set(filteredTrips.map(\.id))
+                            }
+                        }
+                    }
+                } else {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            showAddTrip = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
+
+                    ToolbarItem(placement: .secondaryAction) {
+                        selectButton
+                    }
+
+                    ToolbarItem(placement: .secondaryAction) {
+                        filterMenu
+                    }
                 }
             }
             .sheet(isPresented: $showAddTrip) {
@@ -65,9 +100,37 @@ struct TripsView: View {
                     viewModel: TripFormViewModel(tripService: container.tripService)
                 )
             }
+            .sheet(item: $editingTrip) { trip in
+                TripFormView(
+                    viewModel: TripFormViewModel(tripService: container.tripService, trip: trip)
+                )
+            }
+            .confirmationDialog(
+                "Delete \(selectedTrips.count) Trip\(selectedTrips.count == 1 ? "" : "s")?",
+                isPresented: $showDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    deleteSelectedTrips()
+                }
+            } message: {
+                Text("This action cannot be undone.")
+            }
         }
         .task {
             await loadTrips()
+        }
+    }
+
+    // MARK: - Select Button
+
+    private var selectButton: some View {
+        Button {
+            withAnimation {
+                isSelectMode = true
+            }
+        } label: {
+            Label("Select", systemImage: "checkmark.circle")
         }
     }
 
@@ -105,27 +168,60 @@ struct TripsView: View {
         }
     }
 
+    // MARK: - Delete Bar
+
+    private var deleteBar: some View {
+        Button(role: .destructive) {
+            showDeleteConfirmation = true
+        } label: {
+            HStack {
+                Image(systemName: "trash")
+                Text("Delete \(selectedTrips.count) Trip\(selectedTrips.count == 1 ? "" : "s")")
+            }
+            .fontWeight(.semibold)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.red)
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
     // MARK: - Views
 
     private var tripsList: some View {
         ScrollView {
             LazyVStack(spacing: AppTheme.listSpacing) {
                 ForEach(filteredTrips) { trip in
-                    NavigationLink(value: trip.id) {
-                        TripCard(trip: trip)
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            deleteTrip(trip)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                    if isSelectMode {
+                        selectableTripRow(trip)
+                    } else {
+                        NavigationLink(value: trip.id) {
+                            TripCard(trip: trip)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                editingTrip = trip
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+
+                            Button(role: .destructive) {
+                                deleteTrip(trip)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                 }
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
+            .padding(.bottom, isSelectMode && !selectedTrips.isEmpty ? 70 : 0)
         }
         .background(Color(.systemGroupedBackground))
         .navigationDestination(for: UUID.self) { tripId in
@@ -133,6 +229,26 @@ struct TripsView: View {
         }
         .refreshable {
             await loadTrips()
+        }
+    }
+
+    private func selectableTripRow(_ trip: Trip) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: selectedTrips.contains(trip.id) ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 24))
+                .foregroundStyle(selectedTrips.contains(trip.id) ? .blue : .secondary)
+
+            TripCard(trip: trip)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.2)) {
+                if selectedTrips.contains(trip.id) {
+                    selectedTrips.remove(trip.id)
+                } else {
+                    selectedTrips.insert(trip.id)
+                }
+            }
         }
     }
 
@@ -213,6 +329,23 @@ struct TripsView: View {
                 try await tripService.deleteTrip(by: trip.id)
             } catch {
                 self.error = error
+            }
+        }
+    }
+
+    private func deleteSelectedTrips() {
+        let idsToDelete = selectedTrips
+        Task {
+            for id in idsToDelete {
+                do {
+                    try await tripService.deleteTrip(by: id)
+                } catch {
+                    self.error = error
+                }
+            }
+            withAnimation {
+                selectedTrips.removeAll()
+                isSelectMode = false
             }
         }
     }

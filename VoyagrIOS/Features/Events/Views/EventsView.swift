@@ -6,8 +6,12 @@ struct EventsView: View {
     @State private var isLoading = true
     @State private var error: Error?
     @State private var showAddEvent = false
+    @State private var editingEvent: Event?
     @State private var searchText = ""
     @State private var selectedCategoryFilter: EventCategory?
+    @State private var isSelectMode = false
+    @State private var selectedEvents: Set<UUID> = []
+    @State private var showDeleteConfirmation = false
 
     private var eventService: EventServiceProtocol {
         container.eventService
@@ -32,32 +36,63 @@ struct EventsView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView()
-                } else if let error {
-                    errorView(error)
-                } else if eventService.events.isEmpty {
-                    emptyView
-                } else if filteredEvents.isEmpty {
-                    noResultsView
-                } else {
-                    eventsList
+            ZStack(alignment: .bottom) {
+                Group {
+                    if isLoading {
+                        ProgressView()
+                    } else if let error {
+                        errorView(error)
+                    } else if eventService.events.isEmpty {
+                        emptyView
+                    } else if filteredEvents.isEmpty {
+                        noResultsView
+                    } else {
+                        eventsList
+                    }
+                }
+
+                if isSelectMode && !selectedEvents.isEmpty {
+                    deleteBar
                 }
             }
             .navigationTitle("Events")
             .searchable(text: $searchText, prompt: "Search events")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showAddEvent = true
-                    } label: {
-                        Image(systemName: "plus")
+                if isSelectMode {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Done") {
+                            withAnimation {
+                                isSelectMode = false
+                                selectedEvents.removeAll()
+                            }
+                        }
                     }
-                }
 
-                ToolbarItem(placement: .secondaryAction) {
-                    filterMenu
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(selectedEvents.count == filteredEvents.count ? "Deselect All" : "Select All") {
+                            if selectedEvents.count == filteredEvents.count {
+                                selectedEvents.removeAll()
+                            } else {
+                                selectedEvents = Set(filteredEvents.map(\.id))
+                            }
+                        }
+                    }
+                } else {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            showAddEvent = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
+
+                    ToolbarItem(placement: .secondaryAction) {
+                        selectButton
+                    }
+
+                    ToolbarItem(placement: .secondaryAction) {
+                        filterMenu
+                    }
                 }
             }
             .sheet(isPresented: $showAddEvent) {
@@ -65,9 +100,37 @@ struct EventsView: View {
                     viewModel: EventFormViewModel(eventService: container.eventService)
                 )
             }
+            .sheet(item: $editingEvent) { event in
+                EventFormView(
+                    viewModel: EventFormViewModel(eventService: container.eventService, event: event)
+                )
+            }
+            .confirmationDialog(
+                "Delete \(selectedEvents.count) Event\(selectedEvents.count == 1 ? "" : "s")?",
+                isPresented: $showDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    deleteSelectedEvents()
+                }
+            } message: {
+                Text("This action cannot be undone.")
+            }
         }
         .task {
             await loadEvents()
+        }
+    }
+
+    // MARK: - Select Button
+
+    private var selectButton: some View {
+        Button {
+            withAnimation {
+                isSelectMode = true
+            }
+        } label: {
+            Label("Select", systemImage: "checkmark.circle")
         }
     }
 
@@ -105,27 +168,60 @@ struct EventsView: View {
         }
     }
 
+    // MARK: - Delete Bar
+
+    private var deleteBar: some View {
+        Button(role: .destructive) {
+            showDeleteConfirmation = true
+        } label: {
+            HStack {
+                Image(systemName: "trash")
+                Text("Delete \(selectedEvents.count) Event\(selectedEvents.count == 1 ? "" : "s")")
+            }
+            .fontWeight(.semibold)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.red)
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
     // MARK: - Views
 
     private var eventsList: some View {
         ScrollView {
             LazyVStack(spacing: AppTheme.listSpacing) {
                 ForEach(filteredEvents) { event in
-                    NavigationLink(value: event.id) {
-                        EventCard(event: event)
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            deleteEvent(event)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                    if isSelectMode {
+                        selectableEventRow(event)
+                    } else {
+                        NavigationLink(value: event.id) {
+                            EventCard(event: event)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                editingEvent = event
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+
+                            Button(role: .destructive) {
+                                deleteEvent(event)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                 }
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
+            .padding(.bottom, isSelectMode && !selectedEvents.isEmpty ? 70 : 0)
         }
         .background(Color(.systemGroupedBackground))
         .navigationDestination(for: UUID.self) { eventId in
@@ -133,6 +229,26 @@ struct EventsView: View {
         }
         .refreshable {
             await loadEvents()
+        }
+    }
+
+    private func selectableEventRow(_ event: Event) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: selectedEvents.contains(event.id) ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 24))
+                .foregroundStyle(selectedEvents.contains(event.id) ? .blue : .secondary)
+
+            EventCard(event: event)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.2)) {
+                if selectedEvents.contains(event.id) {
+                    selectedEvents.remove(event.id)
+                } else {
+                    selectedEvents.insert(event.id)
+                }
+            }
         }
     }
 
@@ -213,6 +329,23 @@ struct EventsView: View {
                 try await eventService.deleteEvent(by: event.id)
             } catch {
                 self.error = error
+            }
+        }
+    }
+
+    private func deleteSelectedEvents() {
+        let idsToDelete = selectedEvents
+        Task {
+            for id in idsToDelete {
+                do {
+                    try await eventService.deleteEvent(by: id)
+                } catch {
+                    self.error = error
+                }
+            }
+            withAnimation {
+                selectedEvents.removeAll()
+                isSelectMode = false
             }
         }
     }

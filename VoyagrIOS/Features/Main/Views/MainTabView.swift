@@ -52,6 +52,9 @@ struct MainTabView: View {
                 }
                 .tag(Tab.settings)
         }
+        .onChange(of: selectedTab) {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
         .gesture(
             DragGesture(minimumDistance: 50, coordinateSpace: .global)
                 .onEnded { gesture in

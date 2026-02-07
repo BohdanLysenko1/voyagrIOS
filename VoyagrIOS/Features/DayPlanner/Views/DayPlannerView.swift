@@ -8,6 +8,9 @@ struct DayPlannerView: View {
     @State private var editingTask: DailyTask?
     @State private var isLoading = true
     @State private var error: String?
+    @State private var isSelectMode = false
+    @State private var selectedTasks: Set<UUID> = []
+    @State private var showDeleteConfirmation = false
 
     private var service: DayPlannerServiceProtocol {
         container.dayPlannerService
@@ -15,37 +18,74 @@ struct DayPlannerView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Date selector
-                dateSelector
+            ZStack(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    // Date selector
+                    dateSelector
 
-                Divider()
+                    Divider()
 
-                // Content
-                if isLoading {
-                    loadingView
-                } else {
-                    contentView
+                    // Content
+                    if isLoading {
+                        loadingView
+                    } else {
+                        contentView
+                    }
+                }
+
+                if isSelectMode && !selectedTasks.isEmpty {
+                    deleteBar
                 }
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("My Day")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button {
-                            showAddTask = true
-                        } label: {
-                            Label("Add Task", systemImage: "plus")
+                if isSelectMode {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Done") {
+                            withAnimation {
+                                isSelectMode = false
+                                selectedTasks.removeAll()
+                            }
                         }
+                    }
 
-                        Button {
-                            showRoutines = true
-                        } label: {
-                            Label("Manage Routines", systemImage: "repeat")
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(selectedTasks.count == service.tasksForSelectedDate.count ? "Deselect All" : "Select All") {
+                            if selectedTasks.count == service.tasksForSelectedDate.count {
+                                selectedTasks.removeAll()
+                            } else {
+                                selectedTasks = Set(service.tasksForSelectedDate.map(\.id))
+                            }
                         }
-                    } label: {
-                        Image(systemName: "plus")
+                    }
+                } else {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            Button {
+                                showAddTask = true
+                            } label: {
+                                Label("Add Task", systemImage: "plus")
+                            }
+
+                            Button {
+                                showRoutines = true
+                            } label: {
+                                Label("Manage Routines", systemImage: "repeat")
+                            }
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
+
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button {
+                            withAnimation {
+                                isSelectMode = true
+                            }
+                        } label: {
+                            Label("Select", systemImage: "checkmark.circle")
+                        }
                     }
                 }
             }
@@ -65,6 +105,17 @@ struct DayPlannerView: View {
             }
             .sheet(isPresented: $showRoutines) {
                 RoutinesListView(service: service)
+            }
+            .confirmationDialog(
+                "Delete \(selectedTasks.count) Task\(selectedTasks.count == 1 ? "" : "s")?",
+                isPresented: $showDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    deleteSelectedTasks()
+                }
+            } message: {
+                Text("This action cannot be undone.")
             }
             .task {
                 await loadData()
@@ -100,6 +151,7 @@ struct DayPlannerView: View {
                 proxy.scrollTo(service.selectedDate, anchor: .center)
             }
             .onChange(of: service.selectedDate) { _, newDate in
+                selectedTasks.removeAll()
                 withAnimation {
                     proxy.scrollTo(newDate, anchor: .center)
                 }
@@ -151,6 +203,7 @@ struct DayPlannerView: View {
                 }
             }
             .padding()
+            .padding(.bottom, isSelectMode && !selectedTasks.isEmpty ? 60 : 0)
         }
     }
 
@@ -239,12 +292,26 @@ struct DayPlannerView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("Schedule", icon: "clock.fill")
 
-            ScheduleTimelineView(
-                tasks: service.scheduledTasks,
-                onToggle: { task in toggleTask(task) },
-                onEdit: { task in editingTask = task },
-                onDelete: { task in deleteTask(task) }
-            )
+            if isSelectMode {
+                VStack(spacing: 0) {
+                    ForEach(service.scheduledTasks) { task in
+                        selectableTaskRow(task)
+
+                        if task.id != service.scheduledTasks.last?.id {
+                            Divider().padding(.leading, 50)
+                        }
+                    }
+                }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+            } else {
+                ScheduleTimelineView(
+                    tasks: service.scheduledTasks,
+                    onToggle: { task in toggleTask(task) },
+                    onEdit: { task in editingTask = task },
+                    onDelete: { task in deleteTask(task) }
+                )
+            }
         }
     }
 
@@ -257,12 +324,16 @@ struct DayPlannerView: View {
 
             VStack(spacing: 0) {
                 ForEach(service.unscheduledTasks) { task in
-                    DailyTaskRow(
-                        task: task,
-                        onToggle: { toggleTask(task) },
-                        onEdit: { editingTask = task },
-                        onDelete: { deleteTask(task) }
-                    )
+                    if isSelectMode {
+                        selectableTaskRow(task)
+                    } else {
+                        DailyTaskRow(
+                            task: task,
+                            onToggle: { toggleTask(task) },
+                            onEdit: { editingTask = task },
+                            onDelete: { deleteTask(task) }
+                        )
+                    }
 
                     if task.id != service.unscheduledTasks.last?.id {
                         Divider().padding(.leading, 50)
@@ -327,6 +398,44 @@ struct DayPlannerView: View {
         }
     }
 
+    // MARK: - Selectable Row
+
+    private func selectableTaskRow(_ task: DailyTask) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: selectedTasks.contains(task.id) ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 24))
+                .foregroundStyle(selectedTasks.contains(task.id) ? .blue : .secondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(task.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                HStack(spacing: 4) {
+                    Image(systemName: task.category.icon)
+                        .font(.caption2)
+                    Text(task.category.displayName)
+                        .font(.caption)
+                }
+                .foregroundStyle(task.category.color)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.2)) {
+                if selectedTasks.contains(task.id) {
+                    selectedTasks.remove(task.id)
+                } else {
+                    selectedTasks.insert(task.id)
+                }
+            }
+        }
+    }
+
     // MARK: - Actions
 
     private func loadData() async {
@@ -349,6 +458,41 @@ struct DayPlannerView: View {
         Task {
             try? await service.deleteTask(by: task.id)
         }
+    }
+
+    private func deleteSelectedTasks() {
+        let idsToDelete = selectedTasks
+        Task {
+            for id in idsToDelete {
+                try? await service.deleteTask(by: id)
+            }
+            withAnimation {
+                selectedTasks.removeAll()
+                isSelectMode = false
+            }
+        }
+    }
+
+    // MARK: - Delete Bar
+
+    private var deleteBar: some View {
+        Button(role: .destructive) {
+            showDeleteConfirmation = true
+        } label: {
+            HStack {
+                Image(systemName: "trash")
+                Text("Delete \(selectedTasks.count) Task\(selectedTasks.count == 1 ? "" : "s")")
+            }
+            .fontWeight(.semibold)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.red)
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 }
 
