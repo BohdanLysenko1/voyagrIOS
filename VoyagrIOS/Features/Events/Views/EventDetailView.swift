@@ -300,6 +300,9 @@ struct EventDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
                 }
 
+                // Linked Tasks Card
+                linkedTasksCard(eventId: event.id)
+
                 // Info Card
                 VStack(alignment: .leading, spacing: 0) {
                     sectionHeader("Info", icon: "clock.arrow.circlepath")
@@ -450,6 +453,52 @@ struct EventDetailView: View {
             Spacer()
             Text(value)
                 .fontWeight(.medium)
+        }
+    }
+
+    // MARK: - Linked Tasks
+
+    @ViewBuilder
+    private func linkedTasksCard(eventId: UUID) -> some View {
+        let linkedTasks = container.dayPlannerService.allTasks.filter { $0.eventId == eventId }
+
+        if !linkedTasks.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                sectionHeader("Linked Tasks", icon: "checklist")
+
+                VStack(spacing: 0) {
+                    ForEach(linkedTasks) { task in
+                        HStack(spacing: 12) {
+                            Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 20))
+                                .foregroundStyle(task.isCompleted ? .green : task.category.color)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(task.title)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .strikethrough(task.isCompleted)
+                                    .foregroundStyle(task.isCompleted ? .secondary : .primary)
+
+                                Text(task.date.formatted(date: .abbreviated, time: .omitted))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 10)
+
+                        if task.id != linkedTasks.last?.id {
+                            Divider().padding(.leading, 50)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .background(AppTheme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
         }
     }
 

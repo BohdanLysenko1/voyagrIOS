@@ -36,7 +36,7 @@ struct TripChecklistView: View {
                 }
 
                 // Suggestions
-                if pendingItems.isEmpty && completedItems.isEmpty {
+                if !remainingSuggestions.isEmpty {
                     suggestionsSection
                 }
             }
@@ -220,7 +220,7 @@ struct TripChecklistView: View {
                 .padding(.horizontal)
 
             VStack(spacing: 8) {
-                ForEach(commonTasks, id: \.self) { task in
+                ForEach(remainingSuggestions, id: \.self) { task in
                     Button {
                         addTask(task)
                     } label: {
@@ -261,6 +261,11 @@ struct TripChecklistView: View {
         ]
     }
 
+    private var remainingSuggestions: [String] {
+        let existingTitles = Set(trip.checklistItems.map { $0.title.lowercased() })
+        return commonTasks.filter { !existingTitles.contains($0.lowercased()) }
+    }
+
     // MARK: - Actions
 
     private func toggleItem(_ item: ChecklistItem) {
@@ -276,8 +281,10 @@ struct TripChecklistView: View {
     }
 
     private func addTask(_ title: String) {
-        let item = ChecklistItem(title: title)
-        trip.checklistItems.append(item)
+        withAnimation {
+            let item = ChecklistItem(title: title)
+            trip.checklistItems.append(item)
+        }
     }
 }
 

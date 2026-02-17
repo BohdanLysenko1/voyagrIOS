@@ -2,6 +2,8 @@ import SwiftUI
 
 struct DailyTaskRow: View {
     let task: DailyTask
+    var linkIcon: String? = nil
+    var linkLabel: String? = nil
     let onToggle: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
@@ -52,14 +54,32 @@ struct DailyTaskRow: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+
+                    // Link indicator
+                    if let icon = linkIcon, let label = linkLabel {
+                        HStack(spacing: 3) {
+                            Image(systemName: icon)
+                                .font(.caption2)
+                            Text(label)
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.secondary)
+                    }
                 }
             }
 
             Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 10)
         .padding(.horizontal)
         .contentShape(Rectangle())
+        .onTapGesture {
+            onEdit()
+        }
         .contextMenu {
             Button { onEdit() } label: {
                 Label("Edit", systemImage: "pencil")

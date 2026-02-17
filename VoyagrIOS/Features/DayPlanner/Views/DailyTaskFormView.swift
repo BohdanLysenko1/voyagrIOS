@@ -5,6 +5,8 @@ struct DailyTaskFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     let service: DayPlannerServiceProtocol
+    let tripService: TripServiceProtocol
+    let eventService: EventServiceProtocol
     let task: DailyTask?
 
     @State private var title: String
@@ -15,6 +17,8 @@ struct DailyTaskFormView: View {
     @State private var endTime: Date
     @State private var category: TaskCategory
     @State private var notes: String
+    @State private var selectedTripId: UUID?
+    @State private var selectedEventId: UUID?
 
     @State private var isSaving = false
     @State private var error: String?
@@ -26,8 +30,16 @@ struct DailyTaskFormView: View {
         !title.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
-    init(service: DayPlannerServiceProtocol, task: DailyTask?, defaultDate: Date) {
+    init(
+        service: DayPlannerServiceProtocol,
+        tripService: TripServiceProtocol,
+        eventService: EventServiceProtocol,
+        task: DailyTask?,
+        defaultDate: Date
+    ) {
         self.service = service
+        self.tripService = tripService
+        self.eventService = eventService
         self.task = task
 
         if let task {
@@ -39,6 +51,8 @@ struct DailyTaskFormView: View {
             _endTime = State(initialValue: task.endTime ?? Date().addingTimeInterval(3600))
             _category = State(initialValue: task.category)
             _notes = State(initialValue: task.notes)
+            _selectedTripId = State(initialValue: task.tripId)
+            _selectedEventId = State(initialValue: task.eventId)
         } else {
             _title = State(initialValue: "")
             _date = State(initialValue: defaultDate)
@@ -52,6 +66,8 @@ struct DailyTaskFormView: View {
             _endTime = State(initialValue: defaultStart.addingTimeInterval(3600))
             _category = State(initialValue: .personal)
             _notes = State(initialValue: "")
+            _selectedTripId = State(initialValue: nil)
+            _selectedEventId = State(initialValue: nil)
         }
     }
 
@@ -61,6 +77,7 @@ struct DailyTaskFormView: View {
                 detailsSection
                 scheduleSection
                 categorySection
+                linkSection
                 notesSection
             }
             .scrollDismissesKeyboard(.interactively)
@@ -97,6 +114,14 @@ struct DailyTaskFormView: View {
             } message: {
                 if let error {
                     Text(error)
+                }
+            }
+            .task {
+                if tripService.trips.isEmpty {
+                    try? await tripService.loadTrips()
+                }
+                if eventService.events.isEmpty {
+                    try? await eventService.loadEvents()
                 }
             }
         }
@@ -152,6 +177,30 @@ struct DailyTaskFormView: View {
         }
     }
 
+    private var linkSection: some View {
+        Section("Link To") {
+            Picker("Trip", selection: $selectedTripId) {
+                Text("None")
+                    .tag(UUID?.none)
+
+                ForEach(tripService.trips) { trip in
+                    Label(trip.name, systemImage: "airplane")
+                        .tag(Optional(trip.id))
+                }
+            }
+
+            Picker("Event", selection: $selectedEventId) {
+                Text("None")
+                    .tag(UUID?.none)
+
+                ForEach(eventService.events) { event in
+                    Label(event.title, systemImage: "star")
+                        .tag(Optional(event.id))
+                }
+            }
+        }
+    }
+
     private var notesSection: some View {
         Section("Notes") {
             TextField("Add notes...", text: $notes, axis: .vertical)
@@ -187,6 +236,8 @@ struct DailyTaskFormView: View {
                 category: category,
                 notes: notes,
                 routineId: task?.routineId,
+                tripId: selectedTripId,
+                eventId: selectedEventId,
                 createdAt: task?.createdAt ?? Date()
             )
 
@@ -207,22 +258,22 @@ struct DailyTaskFormView: View {
 }
 
 #Preview("New Task") {
+    let container = AppContainer()
     DailyTaskFormView(
-        service: DayPlannerService(
-            taskRepository: LocalDailyTaskRepository(),
-            routineRepository: LocalDailyRoutineRepository()
-        ),
+        service: container.dayPlannerService,
+        tripService: container.tripService,
+        eventService: container.eventService,
         task: nil,
         defaultDate: Date()
     )
 }
 
 #Preview("Edit Task") {
+    let container = AppContainer()
     DailyTaskFormView(
-        service: DayPlannerService(
-            taskRepository: LocalDailyTaskRepository(),
-            routineRepository: LocalDailyRoutineRepository()
-        ),
+        service: container.dayPlannerService,
+        tripService: container.tripService,
+        eventService: container.eventService,
         task: DailyTask(
             title: "Team Meeting",
             date: Date(),

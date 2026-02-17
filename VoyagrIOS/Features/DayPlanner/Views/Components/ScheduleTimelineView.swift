@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ScheduleTimelineView: View {
     let tasks: [DailyTask]
+    var linkResolver: ((DailyTask) -> (icon: String, label: String)?)?
     let onToggle: (DailyTask) -> Void
     let onEdit: (DailyTask) -> Void
     let onDelete: (DailyTask) -> Void
@@ -88,6 +89,16 @@ struct ScheduleTimelineView: View {
                         .font(.caption)
                 }
                 .foregroundStyle(task.category.color.opacity(0.8))
+
+                if let link = linkResolver?(task) {
+                    HStack(spacing: 3) {
+                        Image(systemName: link.icon)
+                            .font(.caption2)
+                        Text(link.label)
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
@@ -95,6 +106,10 @@ struct ScheduleTimelineView: View {
         .padding(12)
         .background(AppTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .onTapGesture {
+            onEdit(task)
+        }
         .contextMenu {
             Button { onEdit(task) } label: {
                 Label("Edit", systemImage: "pencil")

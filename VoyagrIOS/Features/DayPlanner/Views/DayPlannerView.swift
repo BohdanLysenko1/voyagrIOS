@@ -92,6 +92,8 @@ struct DayPlannerView: View {
             .sheet(isPresented: $showAddTask) {
                 DailyTaskFormView(
                     service: service,
+                    tripService: container.tripService,
+                    eventService: container.eventService,
                     task: nil,
                     defaultDate: service.selectedDate
                 )
@@ -99,6 +101,8 @@ struct DayPlannerView: View {
             .sheet(item: $editingTask) { task in
                 DailyTaskFormView(
                     service: service,
+                    tripService: container.tripService,
+                    eventService: container.eventService,
                     task: task,
                     defaultDate: service.selectedDate
                 )
@@ -148,12 +152,16 @@ struct DayPlannerView: View {
             }
             .background(Color(.systemBackground))
             .onAppear {
-                proxy.scrollTo(service.selectedDate, anchor: .center)
+                let today = Calendar.current.startOfDay(for: service.selectedDate)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    proxy.scrollTo(today, anchor: .leading)
+                }
             }
             .onChange(of: service.selectedDate) { _, newDate in
                 selectedTasks.removeAll()
+                let normalized = Calendar.current.startOfDay(for: newDate)
                 withAnimation {
-                    proxy.scrollTo(newDate, anchor: .center)
+                    proxy.scrollTo(normalized, anchor: .leading)
                 }
             }
         }
@@ -307,6 +315,10 @@ struct DayPlannerView: View {
             } else {
                 ScheduleTimelineView(
                     tasks: service.scheduledTasks,
+                    linkResolver: { task in
+                        guard let icon = linkIcon(for: task), let label = linkLabel(for: task) else { return nil }
+                        return (icon, label)
+                    },
                     onToggle: { task in toggleTask(task) },
                     onEdit: { task in editingTask = task },
                     onDelete: { task in deleteTask(task) }
@@ -329,6 +341,8 @@ struct DayPlannerView: View {
                     } else {
                         DailyTaskRow(
                             task: task,
+                            linkIcon: linkIcon(for: task),
+                            linkLabel: linkLabel(for: task),
                             onToggle: { toggleTask(task) },
                             onEdit: { editingTask = task },
                             onDelete: { deleteTask(task) }
@@ -418,6 +432,16 @@ struct DayPlannerView: View {
                         .font(.caption)
                 }
                 .foregroundStyle(task.category.color)
+
+                if let icon = linkIcon(for: task), let label = linkLabel(for: task) {
+                    HStack(spacing: 4) {
+                        Image(systemName: icon)
+                            .font(.caption2)
+                        Text(label)
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
@@ -434,6 +458,24 @@ struct DayPlannerView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Link Helpers
+
+    private func linkLabel(for task: DailyTask) -> String? {
+        if let tripId = task.tripId, let trip = container.tripService.trip(by: tripId) {
+            return trip.name
+        }
+        if let eventId = task.eventId, let event = container.eventService.event(by: eventId) {
+            return event.title
+        }
+        return nil
+    }
+
+    private func linkIcon(for task: DailyTask) -> String? {
+        if task.tripId != nil { return "airplane" }
+        if task.eventId != nil { return "star" }
+        return nil
     }
 
     // MARK: - Actions
