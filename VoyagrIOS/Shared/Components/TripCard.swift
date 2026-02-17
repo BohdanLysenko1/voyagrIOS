@@ -48,7 +48,7 @@ struct TripCard: View {
 
                 Spacer()
 
-                StatusBadge(status: trip.status, style: .prominent)
+                StatusBadge(status: trip.computedStatus, style: .prominent)
             }
 
             Divider()
@@ -87,7 +87,7 @@ struct TripCard: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                StatusBadge(status: trip.status)
+                StatusBadge(status: trip.computedStatus)
                 Text(dateRangeShort)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -119,7 +119,7 @@ struct TripCard: View {
 
     private var daysRemaining: some View {
         Group {
-            if trip.status == .upcoming || trip.status == .planning {
+            if trip.computedStatus == .upcoming {
                 let days = Calendar.current.dateComponents([.day], from: Date(), to: trip.startDate).day ?? 0
                 if days > 0 {
                     VStack(alignment: .trailing, spacing: 2) {

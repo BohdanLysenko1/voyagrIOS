@@ -12,6 +12,7 @@ struct TripsView: View {
     @State private var isSelectMode = false
     @State private var selectedTrips: Set<UUID> = []
     @State private var showDeleteConfirmation = false
+    @State private var showCompleted = false
 
     private var tripService: TripServiceProtocol {
         container.tripService
@@ -21,7 +22,7 @@ struct TripsView: View {
         var trips = tripService.trips
 
         if let status = selectedStatusFilter {
-            trips = trips.filter { $0.status == status }
+            trips = trips.filter { $0.computedStatus == status }
         }
 
         if !searchText.isEmpty {
@@ -32,6 +33,14 @@ struct TripsView: View {
         }
 
         return trips
+    }
+
+    private var activeTrips: [Trip] {
+        filteredTrips.filter { $0.computedStatus != .completed && $0.computedStatus != .cancelled }
+    }
+
+    private var completedTrips: [Trip] {
+        filteredTrips.filter { $0.computedStatus == .completed }
     }
 
     var body: some View {
@@ -69,11 +78,12 @@ struct TripsView: View {
                     }
 
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(selectedTrips.count == filteredTrips.count ? "Deselect All" : "Select All") {
-                            if selectedTrips.count == filteredTrips.count {
+                        let visibleTrips = activeTrips + (showCompleted ? completedTrips : [])
+                        Button(selectedTrips.count == visibleTrips.count ? "Deselect All" : "Select All") {
+                            if selectedTrips.count == visibleTrips.count {
                                 selectedTrips.removeAll()
                             } else {
-                                selectedTrips = Set(filteredTrips.map(\.id))
+                                selectedTrips = Set(visibleTrips.map(\.id))
                             }
                         }
                     }
@@ -195,28 +205,14 @@ struct TripsView: View {
     private var tripsList: some View {
         ScrollView {
             LazyVStack(spacing: AppTheme.listSpacing) {
-                ForEach(filteredTrips) { trip in
-                    if isSelectMode {
-                        selectableTripRow(trip)
-                    } else {
-                        NavigationLink(value: trip.id) {
-                            TripCard(trip: trip)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button {
-                                editingTrip = trip
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
+                // Active trips
+                ForEach(activeTrips) { trip in
+                    tripRow(trip)
+                }
 
-                            Button(role: .destructive) {
-                                deleteTrip(trip)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                    }
+                // Completed section
+                if !completedTrips.isEmpty {
+                    completedSection
                 }
             }
             .padding(.horizontal)
@@ -229,6 +225,72 @@ struct TripsView: View {
         }
         .refreshable {
             await loadTrips()
+        }
+    }
+
+    @ViewBuilder
+    private func tripRow(_ trip: Trip) -> some View {
+        if isSelectMode {
+            selectableTripRow(trip)
+        } else {
+            NavigationLink(value: trip.id) {
+                TripCard(trip: trip)
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                Button {
+                    editingTrip = trip
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+
+                Button(role: .destructive) {
+                    deleteTrip(trip)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private var completedSection: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    showCompleted.toggle()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.gray)
+                    Text("Completed")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Text("\(completedTrips.count)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Color(.systemGray5))
+                        .clipShape(Capsule())
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(showCompleted ? 90 : 0))
+                }
+                .foregroundStyle(.secondary)
+                .padding()
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+            }
+            .buttonStyle(.plain)
+
+            if showCompleted {
+                ForEach(completedTrips) { trip in
+                    tripRow(trip)
+                }
+            }
         }
     }
 

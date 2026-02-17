@@ -15,7 +15,6 @@ struct TripFormView: View {
             Form {
                 detailsSection
                 datesSection
-                statusSection
                 notesSection
             }
             .scrollDismissesKeyboard(.interactively)
@@ -101,18 +100,6 @@ struct TripFormView: View {
                 Text(error)
                     .foregroundStyle(.red)
             }
-        }
-    }
-
-    private var statusSection: some View {
-        Section("Status") {
-            Picker("Status", selection: $viewModel.status) {
-                ForEach(TripStatus.allCases, id: \.self) { status in
-                    Text(status.displayName)
-                        .tag(status)
-                }
-            }
-            .pickerStyle(.menu)
         }
     }
 

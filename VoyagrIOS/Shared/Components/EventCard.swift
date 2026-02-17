@@ -192,9 +192,22 @@ struct EventCard: View {
                 let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: event.date)).day ?? 0
                 if days > 0 && days <= 7 {
                     upcomingBadge(days: days)
+                } else if days < 0 {
+                    pastBadge
                 }
             }
         }
+    }
+
+    private var pastBadge: some View {
+        Text("Past")
+            .font(.caption2)
+            .fontWeight(.bold)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.gray.opacity(0.15))
+            .foregroundStyle(.gray)
+            .clipShape(Capsule())
     }
 
     private var todayBadge: some View {

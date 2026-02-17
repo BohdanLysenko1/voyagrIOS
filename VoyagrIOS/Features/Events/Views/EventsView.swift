@@ -12,6 +12,7 @@ struct EventsView: View {
     @State private var isSelectMode = false
     @State private var selectedEvents: Set<UUID> = []
     @State private var showDeleteConfirmation = false
+    @State private var showPast = false
 
     private var eventService: EventServiceProtocol {
         container.eventService
@@ -32,6 +33,14 @@ struct EventsView: View {
         }
 
         return events
+    }
+
+    private var upcomingEvents: [Event] {
+        filteredEvents.filter { !$0.isPast }
+    }
+
+    private var pastEvents: [Event] {
+        filteredEvents.filter { $0.isPast }
     }
 
     var body: some View {
@@ -69,11 +78,12 @@ struct EventsView: View {
                     }
 
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(selectedEvents.count == filteredEvents.count ? "Deselect All" : "Select All") {
-                            if selectedEvents.count == filteredEvents.count {
+                        let visibleEvents = upcomingEvents + (showPast ? pastEvents : [])
+                        Button(selectedEvents.count == visibleEvents.count ? "Deselect All" : "Select All") {
+                            if selectedEvents.count == visibleEvents.count {
                                 selectedEvents.removeAll()
                             } else {
-                                selectedEvents = Set(filteredEvents.map(\.id))
+                                selectedEvents = Set(visibleEvents.map(\.id))
                             }
                         }
                     }
@@ -195,28 +205,14 @@ struct EventsView: View {
     private var eventsList: some View {
         ScrollView {
             LazyVStack(spacing: AppTheme.listSpacing) {
-                ForEach(filteredEvents) { event in
-                    if isSelectMode {
-                        selectableEventRow(event)
-                    } else {
-                        NavigationLink(value: event.id) {
-                            EventCard(event: event)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button {
-                                editingEvent = event
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
+                // Upcoming events
+                ForEach(upcomingEvents) { event in
+                    eventRow(event)
+                }
 
-                            Button(role: .destructive) {
-                                deleteEvent(event)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                    }
+                // Past section
+                if !pastEvents.isEmpty {
+                    pastSection
                 }
             }
             .padding(.horizontal)
@@ -229,6 +225,72 @@ struct EventsView: View {
         }
         .refreshable {
             await loadEvents()
+        }
+    }
+
+    @ViewBuilder
+    private func eventRow(_ event: Event) -> some View {
+        if isSelectMode {
+            selectableEventRow(event)
+        } else {
+            NavigationLink(value: event.id) {
+                EventCard(event: event)
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                Button {
+                    editingEvent = event
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+
+                Button(role: .destructive) {
+                    deleteEvent(event)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private var pastSection: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    showPast.toggle()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .foregroundStyle(.gray)
+                    Text("Past Events")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Text("\(pastEvents.count)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Color(.systemGray5))
+                        .clipShape(Capsule())
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(showPast ? 90 : 0))
+                }
+                .foregroundStyle(.secondary)
+                .padding()
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+            }
+            .buttonStyle(.plain)
+
+            if showPast {
+                ForEach(pastEvents) { event in
+                    eventRow(event)
+                }
+            }
         }
     }
 

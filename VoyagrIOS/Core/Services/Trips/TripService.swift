@@ -14,6 +14,17 @@ final class TripService: TripServiceProtocol {
 
     func loadTrips() async throws {
         trips = try await repository.fetchAll()
+        await syncStatuses()
+    }
+
+    private func syncStatuses() async {
+        for i in trips.indices {
+            let computed = trips[i].computedStatus
+            if trips[i].status != computed {
+                trips[i].status = computed
+                _ = try? await repository.save(trips[i])
+            }
+        }
     }
 
     func createTrip(_ trip: Trip) async throws {

@@ -113,7 +113,7 @@ struct TripDetailView: View {
                             Text("Status")
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            StatusBadge(status: trip.status, style: .prominent)
+                            StatusBadge(status: trip.computedStatus, style: .prominent)
                         }
                     }
                     .padding()
@@ -306,7 +306,7 @@ struct TripDetailView: View {
             }
 
             // Days indicator
-            if trip.status == .upcoming || trip.status == .planning {
+            if trip.computedStatus == .upcoming {
                 let days = Calendar.current.dateComponents([.day], from: Date(), to: trip.startDate).day ?? 0
                 if days > 0 {
                     HStack(spacing: 4) {
@@ -323,7 +323,7 @@ struct TripDetailView: View {
                     .background(.blue.opacity(0.1))
                     .clipShape(Capsule())
                 }
-            } else if trip.status == .active {
+            } else if trip.computedStatus == .active {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(.green)

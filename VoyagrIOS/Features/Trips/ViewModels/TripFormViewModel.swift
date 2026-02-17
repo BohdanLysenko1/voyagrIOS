@@ -11,7 +11,6 @@ final class TripFormViewModel {
     var startDate: Date = Date()
     var endDate: Date = Date().addingTimeInterval(86400 * 7) // 1 week default
     var notes: String = ""
-    var status: TripStatus = .planning
 
     // MARK: - State
 
@@ -69,7 +68,6 @@ final class TripFormViewModel {
             self.startDate = trip.startDate
             self.endDate = trip.endDate
             self.notes = trip.notes
-            self.status = trip.status
         }
     }
 
@@ -91,7 +89,7 @@ final class TripFormViewModel {
                     endDate: endDate,
                     notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
                     coverImageURL: existingTrip.coverImageURL,
-                    status: status,
+                    status: existingTrip.status,
                     createdAt: existingTrip.createdAt,
                     updatedAt: Date()
                 )
@@ -102,8 +100,7 @@ final class TripFormViewModel {
                     destination: destination.trimmingCharacters(in: .whitespaces),
                     startDate: startDate,
                     endDate: endDate,
-                    notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
-                    status: status
+                    notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
                 )
                 try await tripService.createTrip(newTrip)
             }

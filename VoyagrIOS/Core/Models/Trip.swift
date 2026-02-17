@@ -158,6 +158,23 @@ struct Trip: Identifiable, Codable, Equatable, Sendable {
         return Double(completed) / Double(checklistItems.count)
     }
 
+    var computedStatus: TripStatus {
+        if status == .cancelled { return .cancelled }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let start = calendar.startOfDay(for: startDate)
+        let end = calendar.startOfDay(for: endDate)
+
+        if end < today {
+            return .completed
+        } else if start <= today && end >= today {
+            return .active
+        } else {
+            return .upcoming
+        }
+    }
+
     var daysUntilTrip: Int? {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())

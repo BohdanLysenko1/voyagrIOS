@@ -138,10 +138,12 @@ struct Event: Identifiable, Codable, Equatable, Sendable {
     }
 
     var isPast: Bool {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
         if let endDate {
-            return endDate < Date()
+            return calendar.startOfDay(for: endDate) < today
         }
-        return date < Date()
+        return calendar.startOfDay(for: date) < today
     }
 }
 
