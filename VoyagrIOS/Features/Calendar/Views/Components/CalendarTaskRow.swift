@@ -49,11 +49,8 @@ struct CalendarTaskRow: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    // Routine indicator
                     if task.routineId != nil {
-                        Label("Routine", systemImage: "repeat")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        RoutineBadge()
                     }
                 }
             }
