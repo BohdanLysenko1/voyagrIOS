@@ -254,7 +254,7 @@ struct TripsView: View {
     }
 
     private var completedSection: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: AppTheme.listSpacing) {
             Button {
                 withAnimation(.spring(response: 0.3)) {
                     showCompleted.toggle()

@@ -126,7 +126,15 @@ struct EventDetailView: View {
 
                         if !event.location.isEmpty {
                             Divider().padding(.leading, 44)
-                            detailRow(icon: "mappin.circle.fill", iconColor: .red, label: "Location", value: event.location)
+                            if let lat = event.locationLatitude, let lng = event.locationLongitude {
+                                TappableLocationRow(
+                                    icon: "mappin.circle.fill", iconColor: .red,
+                                    label: "Location", value: event.location,
+                                    latitude: lat, longitude: lng
+                                )
+                            } else {
+                                detailRow(icon: "mappin.circle.fill", iconColor: .red, label: "Location", value: event.location)
+                            }
                         }
 
                         if !event.address.isEmpty {
@@ -357,9 +365,19 @@ struct EventDetailView: View {
                     .multilineTextAlignment(.center)
 
                 if !event.location.isEmpty {
-                    Label(event.location, systemImage: "location.fill")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    if let lat = event.locationLatitude, let lng = event.locationLongitude {
+                        Button {
+                            MapLink.open(name: event.location, latitude: lat, longitude: lng)
+                        } label: {
+                            Label(event.location, systemImage: "location.fill")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Label(event.location, systemImage: "location.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 

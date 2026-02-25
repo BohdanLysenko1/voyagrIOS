@@ -6,6 +6,8 @@ struct Event: Identifiable, Codable, Equatable, Sendable {
     var date: Date
     var endDate: Date?
     var location: String
+    var locationLatitude: Double?
+    var locationLongitude: Double?
     var address: String
     var notes: String
     var category: EventCategory
@@ -42,6 +44,8 @@ struct Event: Identifiable, Codable, Equatable, Sendable {
         date: Date,
         endDate: Date? = nil,
         location: String = "",
+        locationLatitude: Double? = nil,
+        locationLongitude: Double? = nil,
         address: String = "",
         notes: String = "",
         category: EventCategory = .general,
@@ -62,6 +66,8 @@ struct Event: Identifiable, Codable, Equatable, Sendable {
         self.date = date
         self.endDate = endDate
         self.location = location
+        self.locationLatitude = locationLatitude
+        self.locationLongitude = locationLongitude
         self.address = address
         self.notes = notes
         self.category = category
@@ -81,7 +87,8 @@ struct Event: Identifiable, Codable, Equatable, Sendable {
     // MARK: - Codable (backward compatible)
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date, endDate, location, address, notes, category
+        case id, title, date, endDate, location, locationLatitude, locationLongitude
+        case address, notes, category
         case isAllDay, createdAt, updatedAt, priority, reminders
         case recurrenceRule, attachments, url, cost, currency, tripId
     }
@@ -94,6 +101,8 @@ struct Event: Identifiable, Codable, Equatable, Sendable {
         date = try container.decode(Date.self, forKey: .date)
         endDate = try container.decodeIfPresent(Date.self, forKey: .endDate)
         location = try container.decodeIfPresent(String.self, forKey: .location) ?? ""
+        locationLatitude = try container.decodeIfPresent(Double.self, forKey: .locationLatitude)
+        locationLongitude = try container.decodeIfPresent(Double.self, forKey: .locationLongitude)
         address = try container.decodeIfPresent(String.self, forKey: .address) ?? ""
         notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
         category = try container.decodeIfPresent(EventCategory.self, forKey: .category) ?? .general

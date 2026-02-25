@@ -24,19 +24,11 @@ struct DailyTaskRow: View {
 
             // Content
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(task.title)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .strikethrough(task.isCompleted)
-                        .foregroundStyle(task.isCompleted ? .secondary : .primary)
-
-                    if task.routineId != nil {
-                        Image(systemName: "repeat")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                Text(task.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .strikethrough(task.isCompleted)
+                    .foregroundStyle(task.isCompleted ? .secondary : .primary)
 
                 HStack(spacing: 8) {
                     // Category badge
@@ -47,6 +39,10 @@ struct DailyTaskRow: View {
                             .font(.caption)
                     }
                     .foregroundStyle(task.category.color)
+
+                    if task.routineId != nil {
+                        RoutineBadge()
+                    }
 
                     // Time if scheduled
                     if let timeRange = task.formattedTimeRange {

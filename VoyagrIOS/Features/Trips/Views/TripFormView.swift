@@ -67,8 +67,13 @@ struct TripFormView: View {
             TextField("Trip Name", text: $viewModel.name)
                 .textContentType(.name)
 
-            TextField("Destination", text: $viewModel.destination)
-                .textContentType(.addressCity)
+            LocationSearchField(
+                text: $viewModel.destination,
+                latitude: $viewModel.destinationLatitude,
+                longitude: $viewModel.destinationLongitude,
+                label: "Destination",
+                placeholder: "Search destination..."
+            )
         } header: {
             Text("Details")
         } footer: {

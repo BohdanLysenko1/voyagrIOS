@@ -8,6 +8,8 @@ final class TripFormViewModel {
 
     var name: String = ""
     var destination: String = ""
+    var destinationLatitude: Double?
+    var destinationLongitude: Double?
     var startDate: Date = Date()
     var endDate: Date = Date().addingTimeInterval(86400 * 7) // 1 week default
     var notes: String = ""
@@ -65,6 +67,8 @@ final class TripFormViewModel {
         if let trip {
             self.name = trip.name
             self.destination = trip.destination
+            self.destinationLatitude = trip.destinationLatitude
+            self.destinationLongitude = trip.destinationLongitude
             self.startDate = trip.startDate
             self.endDate = trip.endDate
             self.notes = trip.notes
@@ -85,6 +89,8 @@ final class TripFormViewModel {
                     id: existingTrip.id,
                     name: name.trimmingCharacters(in: .whitespaces),
                     destination: destination.trimmingCharacters(in: .whitespaces),
+                    destinationLatitude: destinationLatitude,
+                    destinationLongitude: destinationLongitude,
                     startDate: startDate,
                     endDate: endDate,
                     notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -98,6 +104,8 @@ final class TripFormViewModel {
                 let newTrip = Trip(
                     name: name.trimmingCharacters(in: .whitespaces),
                     destination: destination.trimmingCharacters(in: .whitespaces),
+                    destinationLatitude: destinationLatitude,
+                    destinationLongitude: destinationLongitude,
                     startDate: startDate,
                     endDate: endDate,
                     notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)

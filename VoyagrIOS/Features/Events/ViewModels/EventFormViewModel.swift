@@ -11,6 +11,8 @@ final class EventFormViewModel {
     var endDate: Date?
     var hasEndDate: Bool = false
     var location: String = ""
+    var locationLatitude: Double?
+    var locationLongitude: Double?
     var address: String = ""
     var notes: String = ""
     var category: EventCategory = .general
@@ -84,6 +86,8 @@ final class EventFormViewModel {
             self.endDate = event.endDate
             self.hasEndDate = event.endDate != nil
             self.location = event.location
+            self.locationLatitude = event.locationLatitude
+            self.locationLongitude = event.locationLongitude
             self.address = event.address
             self.notes = event.notes
             self.category = event.category
@@ -137,6 +141,8 @@ final class EventFormViewModel {
                     date: date,
                     endDate: hasEndDate ? endDate : nil,
                     location: location.trimmingCharacters(in: .whitespaces),
+                    locationLatitude: locationLatitude,
+                    locationLongitude: locationLongitude,
                     address: address.trimmingCharacters(in: .whitespaces),
                     notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
                     category: category,
@@ -159,6 +165,8 @@ final class EventFormViewModel {
                     date: date,
                     endDate: hasEndDate ? endDate : nil,
                     location: location.trimmingCharacters(in: .whitespaces),
+                    locationLatitude: locationLatitude,
+                    locationLongitude: locationLongitude,
                     address: address.trimmingCharacters(in: .whitespaces),
                     notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
                     category: category,

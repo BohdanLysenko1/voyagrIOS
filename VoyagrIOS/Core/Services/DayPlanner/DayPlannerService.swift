@@ -117,18 +117,40 @@ final class DayPlannerService: DayPlannerServiceProtocol {
         try await routineRepository.delete(by: id)
         routines.removeAll { $0.id == id }
 
-        // Remove today's task from this routine if it exists
-        if let taskToRemove = allTasks.first(where: {
-            $0.routineId == id && Calendar.current.isDate($0.date, inSameDayAs: selectedDate)
-        }) {
-            try await deleteTask(by: taskToRemove.id)
+        // Remove all tasks generated from this routine
+        let tasksToRemove = allTasks.filter { $0.routineId == id }
+        for task in tasksToRemove {
+            try await deleteTask(by: task.id)
         }
     }
 
     func toggleRoutineEnabled(_ routine: DailyRoutine) async throws {
         var updatedRoutine = routine
         updatedRoutine.isEnabled.toggle()
-        try await updateRoutine(updatedRoutine)
+        let savedRoutine = try await routineRepository.save(updatedRoutine)
+        if let index = routines.firstIndex(where: { $0.id == routine.id }) {
+            routines[index] = savedRoutine
+        }
+
+        let calendar = Calendar.current
+        if savedRoutine.isEnabled {
+            // Re-generate task for today if applicable
+            if savedRoutine.shouldRunOn(date: selectedDate) {
+                let existingTask = allTasks.first {
+                    $0.routineId == savedRoutine.id && calendar.isDate($0.date, inSameDayAs: selectedDate)
+                }
+                if existingTask == nil {
+                    let task = savedRoutine.createTask(for: selectedDate)
+                    try await createTask(task)
+                }
+            }
+        } else {
+            // Remove all tasks generated from this routine
+            let tasksToRemove = allTasks.filter { $0.routineId == routine.id }
+            for task in tasksToRemove {
+                try await deleteTask(by: task.id)
+            }
+        }
     }
 
     // MARK: - Routine Task Generation

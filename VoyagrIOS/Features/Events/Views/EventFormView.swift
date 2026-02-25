@@ -78,8 +78,13 @@ struct EventFormView: View {
         Section {
             TextField("Event Title", text: $viewModel.title)
 
-            TextField("Location (optional)", text: $viewModel.location)
-                .textContentType(.location)
+            LocationSearchField(
+                text: $viewModel.location,
+                latitude: $viewModel.locationLatitude,
+                longitude: $viewModel.locationLongitude,
+                label: "Location",
+                placeholder: "Search for a place..."
+            )
 
             TextField("Address (optional)", text: $viewModel.address)
                 .textContentType(.fullStreetAddress)

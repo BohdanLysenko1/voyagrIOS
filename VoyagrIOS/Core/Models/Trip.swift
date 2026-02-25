@@ -4,6 +4,8 @@ struct Trip: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var name: String
     var destination: String
+    var destinationLatitude: Double?
+    var destinationLongitude: Double?
     var startDate: Date
     var endDate: Date
     var notes: String
@@ -40,6 +42,8 @@ struct Trip: Identifiable, Codable, Equatable, Sendable {
         id: UUID = UUID(),
         name: String,
         destination: String,
+        destinationLatitude: Double? = nil,
+        destinationLongitude: Double? = nil,
         startDate: Date,
         endDate: Date,
         notes: String = "",
@@ -65,6 +69,8 @@ struct Trip: Identifiable, Codable, Equatable, Sendable {
         self.id = id
         self.name = name
         self.destination = destination
+        self.destinationLatitude = destinationLatitude
+        self.destinationLongitude = destinationLongitude
         self.startDate = startDate
         self.endDate = endDate
         self.notes = notes
@@ -91,7 +97,8 @@ struct Trip: Identifiable, Codable, Equatable, Sendable {
     // MARK: - Codable (backward compatible)
 
     enum CodingKeys: String, CodingKey {
-        case id, name, destination, startDate, endDate, notes, coverImageURL, status
+        case id, name, destination, destinationLatitude, destinationLongitude
+        case startDate, endDate, notes, coverImageURL, status
         case createdAt, updatedAt, budget, currency, expenses, activities
         case packingItems, checklistItems
         case accommodationName, accommodationAddress, accommodationCheckIn
@@ -105,6 +112,8 @@ struct Trip: Identifiable, Codable, Equatable, Sendable {
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         destination = try container.decode(String.self, forKey: .destination)
+        destinationLatitude = try container.decodeIfPresent(Double.self, forKey: .destinationLatitude)
+        destinationLongitude = try container.decodeIfPresent(Double.self, forKey: .destinationLongitude)
         startDate = try container.decode(Date.self, forKey: .startDate)
         endDate = try container.decode(Date.self, forKey: .endDate)
         notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""

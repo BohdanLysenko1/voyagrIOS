@@ -68,27 +68,25 @@ struct ScheduleTimelineView: View {
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 4) {
+                Text(task.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .strikethrough(task.isCompleted)
+                    .foregroundStyle(task.isCompleted ? .secondary : .primary)
+
                 HStack(spacing: 6) {
-                    Text(task.title)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .strikethrough(task.isCompleted)
-                        .foregroundStyle(task.isCompleted ? .secondary : .primary)
+                    HStack(spacing: 4) {
+                        Image(systemName: task.category.icon)
+                            .font(.caption2)
+                        Text(task.category.displayName)
+                            .font(.caption)
+                    }
+                    .foregroundStyle(task.category.color.opacity(0.8))
 
                     if task.routineId != nil {
-                        Image(systemName: "repeat")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        RoutineBadge()
                     }
                 }
-
-                HStack(spacing: 4) {
-                    Image(systemName: task.category.icon)
-                        .font(.caption2)
-                    Text(task.category.displayName)
-                        .font(.caption)
-                }
-                .foregroundStyle(task.category.color.opacity(0.8))
 
                 if let link = linkResolver?(task) {
                     HStack(spacing: 3) {

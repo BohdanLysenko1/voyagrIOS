@@ -254,7 +254,7 @@ struct EventsView: View {
     }
 
     private var pastSection: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: AppTheme.listSpacing) {
             Button {
                 withAnimation(.spring(response: 0.3)) {
                     showPast.toggle()

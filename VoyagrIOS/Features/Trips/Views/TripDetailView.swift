@@ -101,7 +101,15 @@ struct TripDetailView: View {
                     sectionHeader("Details", icon: "info.circle")
 
                     VStack(spacing: 12) {
-                        detailRow(icon: "mappin.circle.fill", iconColor: .red, label: "Destination", value: trip.destination)
+                        if let lat = trip.destinationLatitude, let lng = trip.destinationLongitude {
+                            TappableLocationRow(
+                                icon: "mappin.circle.fill", iconColor: .red,
+                                label: "Destination", value: trip.destination,
+                                latitude: lat, longitude: lng
+                            )
+                        } else {
+                            detailRow(icon: "mappin.circle.fill", iconColor: .red, label: "Destination", value: trip.destination)
+                        }
 
                         Divider().padding(.leading, 44)
 
@@ -300,9 +308,23 @@ struct TripDetailView: View {
                     .font(.title2)
                     .fontWeight(.bold)
 
-                Text(trip.destination)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                if let lat = trip.destinationLatitude, let lng = trip.destinationLongitude {
+                    Button {
+                        MapLink.open(name: trip.destination, latitude: lat, longitude: lng)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "location.fill")
+                                .font(.caption)
+                            Text(trip.destination)
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(trip.destination)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             // Days indicator
