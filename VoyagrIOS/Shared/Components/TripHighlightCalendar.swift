@@ -11,7 +11,7 @@ struct TripHighlightCalendar: View {
 
     private let calendar = Calendar.current
     private let daysOfWeek = Calendar.current.shortWeekdaySymbols
-    private let cellHeight: CGFloat = 40
+    private let cellHeight: CGFloat = 46
 
     var body: some View {
         VStack(spacing: 8) {
@@ -125,7 +125,7 @@ struct TripHighlightCalendar: View {
             bottomTrailingRadius: segment.isEnd ? 6 : 0,
             topTrailingRadius: segment.isEnd ? 6 : 0
         )
-        .fill(segment.color.opacity(0.12))
+        .fill(segment.color.opacity(0.25))
         .frame(width: w, height: cellHeight - 4)
         .position(x: x + w / 2, y: cellHeight / 2)
     }
@@ -142,11 +142,11 @@ struct TripHighlightCalendar: View {
                 if isSelected {
                     Circle()
                         .fill(.blue)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 36, height: 36)
                 } else if isToday {
                     Circle()
                         .strokeBorder(.blue, lineWidth: 1.5)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 36, height: 36)
                 }
 
                 VStack(spacing: 1) {

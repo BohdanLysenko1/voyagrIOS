@@ -12,6 +12,7 @@ struct CalendarView: View {
     @State private var selectedTripStatus: TripStatus?
     @State private var selectedEventCategory: EventCategory?
     @State private var showPast = false
+    @State private var isCalendarCollapsed = false
 
     private var tripService: TripServiceProtocol {
         container.tripService
@@ -28,6 +29,7 @@ struct CalendarView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Header
                 HStack(alignment: .center) {
                     Text("Calendar")
                         .font(.largeTitle.bold())
@@ -38,16 +40,22 @@ struct CalendarView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 8)
 
-                TripHighlightCalendar(
-                    selectedDate: $selectedDate,
-                    trips: tripService.trips,
-                    events: eventService.events,
-                    tasks: dayPlannerService.allTasks
-                )
-                .padding(.vertical, 8)
+                // Collapsible calendar
+                if !isCalendarCollapsed {
+                    TripHighlightCalendar(
+                        selectedDate: $selectedDate,
+                        trips: tripService.trips,
+                        events: eventService.events,
+                        tasks: dayPlannerService.allTasks
+                    )
+                    .padding(.vertical, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
-                Divider()
+                // Drag handle / divider
+                dragHandle
 
+                // Content
                 if isLoading {
                     Spacer()
                     ProgressView()
@@ -71,6 +79,64 @@ struct CalendarView: View {
         .task {
             await loadData()
         }
+    }
+
+    // MARK: - Drag Handle
+
+    private var dragHandle: some View {
+        VStack(spacing: 0) {
+            if isCalendarCollapsed {
+                // Compact month label when collapsed
+                Button {
+                    expandCalendar()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                            .font(.caption)
+                        Text(selectedDate.formatted(.dateTime.year().month(.wide)))
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(.blue)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Capsule()
+                .fill(Color(.systemGray4))
+                .frame(width: 36, height: 4)
+                .padding(.vertical, 6)
+
+            Divider()
+        }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 20)
+                .onEnded { value in
+                    if value.translation.height < -30 && !isCalendarCollapsed {
+                        collapseCalendar()
+                    } else if value.translation.height > 30 && isCalendarCollapsed {
+                        expandCalendar()
+                    }
+                }
+        )
+    }
+
+    private func collapseCalendar() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            isCalendarCollapsed = true
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func expandCalendar() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            isCalendarCollapsed = false
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     // MARK: - Content List
@@ -104,6 +170,16 @@ struct CalendarView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                 }
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 30)
+                        .onEnded { value in
+                            if value.translation.height < -50 && !isCalendarCollapsed {
+                                collapseCalendar()
+                            } else if value.translation.height > 50 && isCalendarCollapsed {
+                                expandCalendar()
+                            }
+                        }
+                )
                 .background(Color(.systemGroupedBackground))
             }
         }
