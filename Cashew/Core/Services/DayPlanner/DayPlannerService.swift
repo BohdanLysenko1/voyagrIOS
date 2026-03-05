@@ -1,0 +1,203 @@
+import Foundation
+import Observation
+
+@Observable
+@MainActor
+final class DayPlannerService: DayPlannerServiceProtocol {
+
+    private let taskRepository: DailyTaskRepositoryProtocol
+    private let routineRepository: DailyRoutineRepositoryProtocol
+
+    private(set) var allTasks: [DailyTask] = []
+    private(set) var routines: [DailyRoutine] = []
+
+    var selectedDate: Date = Date() {
+        didSet {
+            Task {
+                try? await generateTasksFromRoutines(for: selectedDate)
+            }
+        }
+    }
+
+    // MARK: - Computed Properties
+
+    var tasksForSelectedDate: [DailyTask] {
+        let calendar = Calendar.current
+        return allTasks
+            .filter { calendar.isDate($0.date, inSameDayAs: selectedDate) }
+            .sorted { task1, task2 in
+                // Scheduled tasks first, sorted by time
+                if let time1 = task1.startTime, let time2 = task2.startTime {
+                    return time1 < time2
+                }
+                if task1.startTime != nil { return true }
+                if task2.startTime != nil { return false }
+                // Unscheduled: incomplete first, then by creation time
+                if task1.isCompleted != task2.isCompleted {
+                    return !task1.isCompleted
+                }
+                return task1.createdAt < task2.createdAt
+            }
+    }
+
+    var scheduledTasks: [DailyTask] {
+        tasksForSelectedDate.filter { $0.isScheduled }
+    }
+
+    var unscheduledTasks: [DailyTask] {
+        tasksForSelectedDate.filter { !$0.isScheduled }
+    }
+
+    // MARK: - Init
+
+    init(taskRepository: DailyTaskRepositoryProtocol, routineRepository: DailyRoutineRepositoryProtocol) {
+        self.taskRepository = taskRepository
+        self.routineRepository = routineRepository
+    }
+
+    // MARK: - Load Data
+
+    func loadData() async throws {
+        allTasks = try await taskRepository.fetchAll()
+        routines = try await routineRepository.fetchAll()
+
+        // Generate tasks from routines for today
+        try await generateTasksFromRoutines(for: selectedDate)
+    }
+
+    // MARK: - Task CRUD
+
+    func createTask(_ task: DailyTask) async throws {
+        let savedTask = try await taskRepository.save(task)
+        allTasks.append(savedTask)
+    }
+
+    func updateTask(_ task: DailyTask) async throws {
+        let savedTask = try await taskRepository.save(task)
+        if let index = allTasks.firstIndex(where: { $0.id == task.id }) {
+            allTasks[index] = savedTask
+        }
+    }
+
+    func deleteTask(by id: UUID) async throws {
+        try await taskRepository.delete(by: id)
+        allTasks.removeAll { $0.id == id }
+    }
+
+    func toggleTaskCompletion(_ task: DailyTask) async throws {
+        var updatedTask = task
+        updatedTask.isCompleted.toggle()
+        try await updateTask(updatedTask)
+    }
+
+    // MARK: - Routine CRUD
+
+    func createRoutine(_ routine: DailyRoutine) async throws {
+        let savedRoutine = try await routineRepository.save(routine)
+        routines.append(savedRoutine)
+
+        // Generate task for today if applicable
+        if savedRoutine.shouldRunOn(date: selectedDate) {
+            let task = savedRoutine.createTask(for: selectedDate)
+            try await createTask(task)
+        }
+    }
+
+    func updateRoutine(_ routine: DailyRoutine) async throws {
+        let savedRoutine = try await routineRepository.save(routine)
+        if let index = routines.firstIndex(where: { $0.id == routine.id }) {
+            routines[index] = savedRoutine
+        }
+
+        // Update any existing tasks from this routine for today
+        await updateRoutineTasksForToday(routine: savedRoutine)
+    }
+
+    func deleteRoutine(by id: UUID) async throws {
+        try await routineRepository.delete(by: id)
+        routines.removeAll { $0.id == id }
+
+        // Remove all tasks generated from this routine
+        let tasksToRemove = allTasks.filter { $0.routineId == id }
+        for task in tasksToRemove {
+            try await deleteTask(by: task.id)
+        }
+    }
+
+    func toggleRoutineEnabled(_ routine: DailyRoutine) async throws {
+        var updatedRoutine = routine
+        updatedRoutine.isEnabled.toggle()
+        let savedRoutine = try await routineRepository.save(updatedRoutine)
+        if let index = routines.firstIndex(where: { $0.id == routine.id }) {
+            routines[index] = savedRoutine
+        }
+
+        let calendar = Calendar.current
+        if savedRoutine.isEnabled {
+            // Re-generate task for today if applicable
+            if savedRoutine.shouldRunOn(date: selectedDate) {
+                let existingTask = allTasks.first {
+                    $0.routineId == savedRoutine.id && calendar.isDate($0.date, inSameDayAs: selectedDate)
+                }
+                if existingTask == nil {
+                    let task = savedRoutine.createTask(for: selectedDate)
+                    try await createTask(task)
+                }
+            }
+        } else {
+            // Remove all tasks generated from this routine
+            let tasksToRemove = allTasks.filter { $0.routineId == routine.id }
+            for task in tasksToRemove {
+                try await deleteTask(by: task.id)
+            }
+        }
+    }
+
+    // MARK: - Routine Task Generation
+
+    func generateTasksFromRoutines(for date: Date) async throws {
+        let calendar = Calendar.current
+
+        for routine in routines where routine.shouldRunOn(date: date) {
+            // Check if task already exists for this routine on this date
+            let existingTask = allTasks.first {
+                $0.routineId == routine.id && calendar.isDate($0.date, inSameDayAs: date)
+            }
+
+            if existingTask == nil {
+                let task = routine.createTask(for: date)
+                try await createTask(task)
+            }
+        }
+    }
+
+    // MARK: - Private Helpers
+
+    private func updateRoutineTasksForToday(routine: DailyRoutine) async {
+        let calendar = Calendar.current
+
+        // Find today's task from this routine
+        if let existingTask = allTasks.first(where: {
+            $0.routineId == routine.id && calendar.isDate($0.date, inSameDayAs: selectedDate)
+        }) {
+            // Update the task with new routine values (but keep completion status)
+            var updatedTask = existingTask
+            updatedTask.title = routine.title
+            updatedTask.startTime = routine.startTime
+            updatedTask.endTime = routine.endTime
+            updatedTask.category = routine.category
+            updatedTask.notes = routine.notes
+
+            try? await updateTask(updatedTask)
+        }
+    }
+
+    // MARK: - Cleanup
+
+    func cleanupOldTasks(olderThan days: Int = 30) async throws {
+        let calendar = Calendar.current
+        guard let cutoffDate = calendar.date(byAdding: .day, value: -days, to: Date()) else { return }
+        try await taskRepository.deleteOlderThan(cutoffDate)
+        allTasks.removeAll { $0.date < cutoffDate }
+    }
+}
