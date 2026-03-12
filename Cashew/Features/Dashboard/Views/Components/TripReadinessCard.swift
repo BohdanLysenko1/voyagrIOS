@@ -4,22 +4,16 @@ struct TripReadinessCard: View {
 
     let trip: Trip
 
-    private var packingPercent: Double {
-        trip.packingProgress
-    }
-
-    private var checklistPercent: Double {
-        trip.checklistProgress
-    }
+    private var packingPacked: Int { trip.packingItems.filter { $0.isPacked }.count }
+    private var checklistDone: Int { trip.checklistItems.filter { $0.isCompleted }.count }
 
     private var overallReadiness: Double {
-        let hasPackingItems = !trip.packingItems.isEmpty
-        let hasChecklistItems = !trip.checklistItems.isEmpty
-
-        if !hasPackingItems && !hasChecklistItems { return 1.0 }
-        if !hasPackingItems { return checklistPercent }
-        if !hasChecklistItems { return packingPercent }
-        return (packingPercent + checklistPercent) / 2.0
+        let hasPacking = !trip.packingItems.isEmpty
+        let hasChecklist = !trip.checklistItems.isEmpty
+        if !hasPacking && !hasChecklist { return 1.0 }
+        if !hasPacking { return trip.checklistProgress }
+        if !hasChecklist { return trip.packingProgress }
+        return (trip.packingProgress + trip.checklistProgress) / 2.0
     }
 
     private var readinessColor: Color {
@@ -30,168 +24,145 @@ struct TripReadinessCard: View {
 
     private var daysLabel: String {
         guard let days = trip.daysUntilTrip else { return "" }
+        if days < 0 { return "In progress" }
         if days == 0 { return "Today!" }
         if days == 1 { return "Tomorrow" }
-        return "\(days) days"
+        return "\(days) days away"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Trip name + days
-            HStack {
+        HStack(alignment: .top, spacing: 14) {
+
+            // Left: name + location + bars
+            VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(trip.name)
                         .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin")
-                            .font(.caption2)
+                    HStack(spacing: 3) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.orange)
                         Text(trip.destination)
                             .font(.caption)
-                    }
-                    .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                // Readiness badge
-                VStack(spacing: 2) {
-                    Text("\(Int(overallReadiness * 100))%")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(readinessColor)
-                    Text(daysLabel)
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(readinessColor.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-
-            // Progress bars
-            VStack(spacing: 8) {
-                if !trip.packingItems.isEmpty {
-                    progressRow(
-                        icon: "bag.fill",
-                        label: "Packing",
-                        progress: packingPercent,
-                        detail: "\(trip.packingItems.filter(\.isPacked).count)/\(trip.packingItems.count)"
-                    )
-                }
-
-                if !trip.checklistItems.isEmpty {
-                    progressRow(
-                        icon: "checklist",
-                        label: "Checklist",
-                        progress: checklistPercent,
-                        detail: "\(trip.checklistItems.filter(\.isCompleted).count)/\(trip.checklistItems.count)"
-                    )
-                }
-
-                if trip.packingItems.isEmpty && trip.checklistItems.isEmpty {
-                    HStack(spacing: 6) {
-                        Image(systemName: "info.circle")
-                            .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("No packing or checklist items yet")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        if !daysLabel.isEmpty {
+                            Text("· \(daysLabel)")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
-            }
-        }
-        .padding(14)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
 
-    private func progressRow(icon: String, label: String, progress: Double, detail: String) -> some View {
-        VStack(spacing: 4) {
-            HStack {
-                Image(systemName: icon)
+                if !trip.packingItems.isEmpty || !trip.checklistItems.isEmpty {
+                    VStack(alignment: .leading, spacing: 5) {
+                        if !trip.packingItems.isEmpty {
+                            progressRow(
+                                label: "Packing",
+                                progress: trip.packingProgress,
+                                fraction: "\(packingPacked)/\(trip.packingItems.count)"
+                            )
+                        }
+                        if !trip.checklistItems.isEmpty {
+                            progressRow(
+                                label: "Checklist",
+                                progress: trip.checklistProgress,
+                                fraction: "\(checklistDone)/\(trip.checklistItems.count)"
+                            )
+                        }
+                    }
+                } else {
+                    Text("No items added yet")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            // Right: readiness %
+            VStack(alignment: .trailing, spacing: 1) {
+                Text("\(Int(overallReadiness * 100))%")
+                    .font(.title2)
+                    .fontWeight(.black)
+                    .foregroundStyle(readinessColor)
+                    .monospacedDigit()
+                Text("ready")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(detail)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .monospacedDigit()
             }
+        }
+        .padding(AppTheme.cardPadding)
+    }
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color(.systemGray5))
-                        .frame(height: 6)
+    private func progressRow(label: String, progress: Double, fraction: String) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
 
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(progressBarColor(progress).gradient)
-                        .frame(width: geo.size.width * progress, height: 6)
-                        .animation(.spring(response: 0.5), value: progress)
-                }
-            }
-            .frame(height: 6)
+            AppProgressBar(progress: progress, color: barColor(progress))
+
+            Text(fraction)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .frame(width: 24, alignment: .trailing)
         }
     }
 
-    private func progressBarColor(_ progress: Double) -> Color {
+    private func barColor(_ progress: Double) -> Color {
         if progress >= 1.0 { return .green }
-        if progress >= 0.5 { return .blue }
-        return .orange
+        if progress >= 0.5 { return .orange }
+        return .red
     }
 }
+
+// MARK: - Section
 
 struct TripReadinessSection: View {
 
     let trips: [Trip]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "airplane.circle.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(AppTheme.tripGradient)
-                Text("Trip Readiness")
-                    .font(.headline)
-                    .fontWeight(.bold)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                SectionHeader(
+                    icon: "airplane.circle.fill",
+                    title: "Trip Readiness",
+                    gradient: AppTheme.tripGradient
+                )
                 Spacer()
             }
+            .padding(AppTheme.cardPadding)
 
-            if trips.isEmpty {
-                HStack(spacing: 12) {
-                    Image(systemName: "airplane")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
+            Divider()
+                .padding(.horizontal, AppTheme.cardPadding)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("No upcoming trips")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Text("Plan your next adventure!")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
+            ForEach(trips) { trip in
+                NavigationLink(value: trip.id) {
+                    TripReadinessCard(trip: trip)
                 }
-                .padding(.vertical, 8)
-            } else {
-                ForEach(trips) { trip in
-                    NavigationLink(value: trip.id) {
-                        TripReadinessCard(trip: trip)
-                    }
-                    .buttonStyle(.plain)
+                .buttonStyle(.plain)
+
+                if trip.id != trips.last?.id {
+                    Divider()
+                        .padding(.horizontal, AppTheme.cardPadding)
                 }
             }
         }
-        .padding(AppTheme.cardPadding)
-        .cardStyle()
+        .background(AppTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+        .shadow(
+            color: AppTheme.cardShadow,
+            radius: AppTheme.cardShadowRadius,
+            x: 0,
+            y: AppTheme.cardShadowY
+        )
     }
 }

@@ -4,6 +4,10 @@ import Foundation
 enum XPCalculator {
 
     static let dayCompletionBonus = 25
+    /// XP awarded per completed subtask.
+    static let subtaskXP = 5
+    /// Bonus XP for the parent task when all subtasks are completed.
+    static let subtaskCompletionBonus = 15
 
     /// Grace period before a scheduled task is considered overdue (30 minutes).
     static let overdueGracePeriod: TimeInterval = 30 * 60

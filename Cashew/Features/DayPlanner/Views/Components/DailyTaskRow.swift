@@ -5,81 +5,147 @@ struct DailyTaskRow: View {
     var linkIcon: String? = nil
     var linkLabel: String? = nil
     let onToggle: () -> Void
+    var onSubtaskToggle: ((UUID) -> Void)? = nil
+    let onDetail: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
 
     @State private var checkScale: CGFloat = 1.0
     @State private var showConfetti = false
+    @State private var isExpanded: Bool = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Checkbox
-            Button {
-                triggerToggle()
-            } label: {
-                Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 24))
-                    .foregroundStyle(task.isCompleted ? .green : task.category.color)
-                    .scaleEffect(checkScale)
-                    .symbolEffect(.bounce, value: task.isCompleted)
-            }
-            .buttonStyle(.plain)
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                // Checkbox
+                Button {
+                    triggerToggle()
+                } label: {
+                    Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 24))
+                        .foregroundStyle(task.isCompleted ? .green : task.category.color)
+                        .scaleEffect(checkScale)
+                        .symbolEffect(.bounce, value: task.isCompleted)
+                }
+                .buttonStyle(.plain)
 
-            // Content
-            VStack(alignment: .leading, spacing: 4) {
-                Text(task.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .strikethrough(task.isCompleted)
-                    .foregroundStyle(task.isCompleted ? .secondary : .primary)
-                    .animation(.easeInOut(duration: 0.2), value: task.isCompleted)
+                // Content
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(task.title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .strikethrough(task.isCompleted)
+                        .foregroundStyle(task.isCompleted ? .secondary : .primary)
+                        .animation(.easeInOut(duration: 0.2), value: task.isCompleted)
 
-                HStack(spacing: 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: task.category.icon)
-                            .font(.caption2)
-                        Text(task.categoryDisplayName)
-                            .font(.caption)
-                    }
-                    .foregroundStyle(task.category.color)
-
-                    if task.routineId != nil {
-                        RoutineBadge()
-                    }
-
-                    if let timeRange = task.formattedTimeRange {
-                        Text(timeRange)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if let icon = linkIcon, let label = linkLabel {
-                        HStack(spacing: 3) {
-                            Image(systemName: icon)
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Image(systemName: task.category.icon)
                                 .font(.caption2)
-                            Text(label)
+                            Text(task.categoryDisplayName)
                                 .font(.caption)
                         }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(task.category.color)
+
+                        if task.routineId != nil {
+                            RoutineBadge()
+                        }
+
+                        if let timeRange = task.formattedTimeRange {
+                            Text(timeRange)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if task.hasSubtasks {
+                            HStack(spacing: 3) {
+                                Image(systemName: "checklist")
+                                    .font(.caption2)
+                                Text(task.subtaskProgress)
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(task.allSubtasksCompleted ? .green : .secondary)
+                        }
+
+                        if let icon = linkIcon, let label = linkLabel {
+                            HStack(spacing: 3) {
+                                Image(systemName: icon)
+                                    .font(.caption2)
+                                Text(label)
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(.secondary)
+                        }
                     }
+                }
+
+                Spacer()
+
+                // Expand/collapse chevron for subtasks, plain chevron otherwise
+                if task.hasSubtasks {
+                    Button {
+                        withAnimation(.spring(response: AppTheme.springResponse, dampingFraction: 0.7)) {
+                            isExpanded.toggle()
+                        }
+                        HapticManager.selection()
+                    } label: {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal)
+            .contentShape(Rectangle())
+            .onTapGesture { onDetail() }
+            .overlay(alignment: .leading) {
+                if showConfetti {
+                    ConfettiView()
+                        .offset(x: 28)
                 }
             }
 
-            Spacer()
+            // Subtask list (expanded)
+            if isExpanded && task.hasSubtasks {
+                VStack(spacing: 0) {
+                    Divider().padding(.leading)
+                    ForEach(task.subtasks) { subtask in
+                        HStack(spacing: 12) {
+                            Spacer().frame(width: 20)
 
-            Image(systemName: "chevron.right")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.vertical, 10)
-        .padding(.horizontal)
-        .contentShape(Rectangle())
-        .onTapGesture { onEdit() }
-        // Confetti anchored to the leading checkbox area
-        .overlay(alignment: .leading) {
-            if showConfetti {
-                ConfettiView()
-                    .offset(x: 28)
+                            Button {
+                                onSubtaskToggle?(subtask.id)
+                                HapticManager.impact(subtask.isCompleted ? .light : .medium)
+                            } label: {
+                                Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(subtask.isCompleted ? .green : .secondary)
+                            }
+                            .buttonStyle(.plain)
+
+                            Text(subtask.title)
+                                .font(.subheadline)
+                                .strikethrough(subtask.isCompleted)
+                                .foregroundStyle(subtask.isCompleted ? .secondary : .primary)
+                                .animation(.easeInOut(duration: 0.2), value: subtask.isCompleted)
+
+                            Spacer()
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal)
+
+                        if subtask.id != task.subtasks.last?.id {
+                            Divider().padding(.leading, 52)
+                        }
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .contextMenu {
@@ -126,17 +192,17 @@ struct DailyTaskRow: View {
         DailyTaskRow(
             task: DailyTask(title: "Morning workout", date: Date(), startTime: Date(),
                             endTime: Date().addingTimeInterval(3600), category: .health),
-            onToggle: {}, onEdit: {}, onDelete: {}
+            onToggle: {}, onDetail: {}, onEdit: {}, onDelete: {}
         )
         Divider().padding(.leading, 50)
         DailyTaskRow(
             task: DailyTask(title: "Buy groceries", date: Date(), category: .errands),
-            onToggle: {}, onEdit: {}, onDelete: {}
+            onToggle: {}, onDetail: {}, onEdit: {}, onDelete: {}
         )
         Divider().padding(.leading, 50)
         DailyTaskRow(
             task: DailyTask(title: "Completed task", date: Date(), isCompleted: true, category: .work),
-            onToggle: {}, onEdit: {}, onDelete: {}
+            onToggle: {}, onDetail: {}, onEdit: {}, onDelete: {}
         )
     }
     .background(AppTheme.cardBackground)

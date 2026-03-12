@@ -3,33 +3,24 @@ import SwiftUI
 // MARK: - Urgency
 
 enum SmartAlertUrgency {
-    case critical   // needs action NOW
-    case warning    // needs action today
-    case info       // useful to know
+    case critical
+    case warning
+    case info
 }
 
 // MARK: - Alert Type
 
 enum SmartAlertType {
 
-    // Time-sensitive
     case taskOverdue(taskTitle: String)
     case eventStartingSoon(eventName: String, minutesUntil: Int)
     case taskDueToday(taskTitle: String, dueTime: Date?)
-
-    // Streak
     case streakAtRisk(routineName: String)
-
-    // Trip
     case packingNeeded(tripName: String, itemsLeft: Int, daysUntil: Int)
     case budgetWarning(tripName: String, percentUsed: Int)
     case overdueChecklist(tripName: String, overdueCount: Int)
     case lowReadiness(tripName: String, readinessPercent: Int, daysUntil: Int)
-
-    // Misc
     case noTasksToday
-
-    // MARK: Urgency
 
     var urgency: SmartAlertUrgency {
         switch self {
@@ -43,8 +34,6 @@ enum SmartAlertType {
             return .info
         }
     }
-
-    // MARK: Icon
 
     var icon: String {
         switch self {
@@ -67,8 +56,6 @@ enum SmartAlertType {
         case .info:     return .blue
         }
     }
-
-    // MARK: Text
 
     var title: String {
         switch self {
@@ -119,16 +106,6 @@ enum SmartAlertType {
         }
     }
 
-    // MARK: Formatters
-
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.timeStyle = .short
-        return f
-    }()
-
-    // MARK: Priority (lower = shown first)
-
     var priority: Int {
         switch self {
         case .taskOverdue:                          return 0
@@ -142,75 +119,12 @@ enum SmartAlertType {
         case .noTasksToday:                         return 9
         }
     }
-}
 
-// MARK: - Alert Row
-
-struct SmartAlertRow: View {
-
-    let alert: SmartAlertType
-
-    var body: some View {
-        HStack(spacing: 12) {
-            iconBadge
-            textStack
-            Spacer(minLength: 4)
-            urgencyIndicator
-        }
-        .padding(.horizontal, AppTheme.cardPadding)
-        .padding(.vertical, 10)
-        .background(rowBackground)
-    }
-
-    private var iconBadge: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(alert.iconColor.opacity(0.12))
-                .frame(width: 40, height: 40)
-            Image(systemName: alert.icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(alert.iconColor)
-        }
-    }
-
-    private var textStack: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(alert.title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-            Text(alert.subtitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-    }
-
-    @ViewBuilder
-    private var urgencyIndicator: some View {
-        switch alert.urgency {
-        case .critical:
-            Circle()
-                .fill(Color.red)
-                .frame(width: 8, height: 8)
-        case .warning:
-            Circle()
-                .fill(Color.orange.opacity(0.7))
-                .frame(width: 8, height: 8)
-        case .info:
-            EmptyView()
-        }
-    }
-
-    @ViewBuilder
-    private var rowBackground: some View {
-        if alert.urgency == .critical {
-            Color.red.opacity(0.04)
-        } else {
-            Color.clear
-        }
-    }
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.timeStyle = .short
+        return f
+    }()
 }
 
 // MARK: - Section
@@ -219,68 +133,87 @@ struct SmartAlertsSection: View {
 
     let alerts: [SmartAlertType]
 
-    private var sortedAlerts: [SmartAlertType] {
-        Array(alerts.sorted { $0.priority < $1.priority }.prefix(5))
+    private var sorted: [SmartAlertType] {
+        Array(alerts.sorted { $0.priority < $1.priority }.prefix(4))
     }
 
-    private var hasCritical: Bool {
-        sortedAlerts.contains { $0.urgency == .critical }
-    }
+    private var primary: SmartAlertType? { sorted.first }
+    private var secondary: [SmartAlertType] { Array(sorted.dropFirst()) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            sectionHeader
-            Divider()
-            alertList
+        VStack(spacing: 0) {
+            if let primary {
+                primaryAlert(primary)
+
+                if !secondary.isEmpty {
+                    Divider()
+                        .padding(.leading, AppTheme.cardPadding)
+
+                    ForEach(Array(secondary.enumerated()), id: \.offset) { index, alert in
+                        secondaryRow(alert)
+                        if index < secondary.count - 1 {
+                            Divider()
+                                .padding(.leading, AppTheme.cardPadding)
+                        }
+                    }
+                }
+            }
         }
         .background(AppTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
         .shadow(color: AppTheme.cardShadow, radius: AppTheme.cardShadowRadius, x: 0, y: AppTheme.cardShadowY)
-        .overlay(
-            RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius)
-                .stroke(hasCritical ? Color.red.opacity(0.25) : Color.clear, lineWidth: 1.5)
-        )
-    }
-
-    // MARK: Header
-
-    private var sectionHeader: some View {
-        HStack(spacing: 8) {
-            Image(systemName: hasCritical ? "bell.badge.fill" : "bell.fill")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(hasCritical
-                    ? AnyShapeStyle(LinearGradient(colors: [.red, .orange], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    : AnyShapeStyle(LinearGradient(colors: [.orange, .yellow], startPoint: .topLeading, endPoint: .bottomTrailing)))
-
-            Text("Needs Attention")
-                .font(.headline)
-                .fontWeight(.bold)
-
-            Spacer()
-
-            Text("\(sortedAlerts.count)")
-                .font(.caption2)
-                .fontWeight(.bold)
-                .foregroundStyle(.white)
-                .frame(width: 20, height: 20)
-                .background(hasCritical ? Color.red : Color.orange)
-                .clipShape(Circle())
+        // Urgency accent border on the left
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(primary?.iconColor ?? .orange)
+                .frame(width: 3)
+                .padding(.vertical, 1)
         }
-        .padding(AppTheme.cardPadding)
     }
 
-    // MARK: List
+    // MARK: - Primary alert (top, featured)
 
-    private var alertList: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(sortedAlerts.enumerated()), id: \.offset) { index, alert in
-                SmartAlertRow(alert: alert)
-                if index < sortedAlerts.count - 1 {
-                    Divider()
-                        .padding(.leading, AppTheme.cardPadding + 52)
-                }
+    private func primaryAlert(_ alert: SmartAlertType) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: alert.icon)
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(alert.iconColor)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(alert.title)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                Text(alert.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
+
+            Spacer(minLength: 0)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, AppTheme.cardPadding)
+        .padding(.vertical, 14)
+        .background(alert.iconColor.opacity(0.07))
+    }
+
+    // MARK: - Secondary row (compact, no subtitle)
+
+    private func secondaryRow(_ alert: SmartAlertType) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: alert.icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(alert.iconColor)
+                .frame(width: 16)
+
+            Text(alert.title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, AppTheme.cardPadding)
+        .padding(.vertical, 10)
     }
 }

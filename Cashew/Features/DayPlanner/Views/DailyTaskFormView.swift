@@ -21,6 +21,10 @@ struct DailyTaskFormView: View {
     @State private var selectedTripId: UUID?
     @State private var selectedEventId: UUID?
 
+    @State private var subtasks: [Subtask]
+    @State private var newSubtaskTitle: String = ""
+    @State private var showAddSubtaskField: Bool = false
+
     @State private var isSaving = false
     @State private var error: String?
     @State private var showError = false
@@ -42,6 +46,8 @@ struct DailyTaskFormView: View {
         self.tripService = tripService
         self.eventService = eventService
         self.task = task
+
+        _subtasks = State(initialValue: task?.subtasks ?? [])
 
         if let task {
             _title = State(initialValue: task.title)
@@ -82,6 +88,7 @@ struct DailyTaskFormView: View {
                 categorySection
                 linkSection
                 notesSection
+                subtasksSection
             }
             .scrollDismissesKeyboard(.interactively)
             .toolbar {
@@ -221,6 +228,63 @@ struct DailyTaskFormView: View {
         }
     }
 
+    private var subtasksSection: some View {
+        Section {
+            ForEach($subtasks) { $subtask in
+                HStack(spacing: 12) {
+                    Button {
+                        subtask.isCompleted.toggle()
+                        HapticManager.impact(.light)
+                    } label: {
+                        Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(subtask.isCompleted ? .green : .secondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    TextField("Subtask", text: $subtask.title)
+                        .strikethrough(subtask.isCompleted)
+                        .foregroundStyle(subtask.isCompleted ? .secondary : .primary)
+                }
+            }
+            .onDelete { indexSet in subtasks.remove(atOffsets: indexSet) }
+            .onMove { from, to in subtasks.move(fromOffsets: from, toOffset: to) }
+
+            if showAddSubtaskField {
+                HStack {
+                    TextField("New subtask...", text: $newSubtaskTitle)
+                        .submitLabel(.done)
+                        .onSubmit { commitNewSubtask() }
+
+                    Button("Add") { commitNewSubtask() }
+                        .disabled(newSubtaskTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+
+            Button {
+                showAddSubtaskField = true
+            } label: {
+                Label("Add Subtask", systemImage: "plus.circle")
+            }
+        } header: {
+            Text("Subtasks")
+        } footer: {
+            if !subtasks.isEmpty {
+                let done = subtasks.filter(\.isCompleted).count
+                Text("\(done) of \(subtasks.count) completed")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func commitNewSubtask() {
+        let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        subtasks.append(Subtask(title: trimmed))
+        newSubtaskTitle = ""
+        showAddSubtaskField = false
+        HapticManager.impact(.light)
+    }
+
     private var savingOverlay: some View {
         ZStack {
             Color.black.opacity(0.2)
@@ -260,6 +324,7 @@ struct DailyTaskFormView: View {
                 routineId: task?.routineId,
                 tripId: selectedTripId,
                 eventId: selectedEventId,
+                subtasks: subtasks,
                 createdAt: task?.createdAt ?? Date()
             )
 

@@ -5,6 +5,7 @@ struct DayPlannerView: View {
     @Environment(AppContainer.self) private var container
     @State private var showAddTask = false
     @State private var showRoutines = false
+    @State private var detailTask: DailyTask?
     @State private var editingTask: DailyTask?
     @State private var isLoading = true
     @State private var error: String?
@@ -96,6 +97,14 @@ struct DayPlannerView: View {
                     eventService: container.eventService,
                     task: nil,
                     defaultDate: service.selectedDate
+                )
+            }
+            .sheet(item: $detailTask) { task in
+                TaskDetailView(
+                    task: task,
+                    service: service,
+                    tripService: container.tripService,
+                    eventService: container.eventService
                 )
             }
             .sheet(item: $editingTask) { task in
@@ -322,6 +331,7 @@ struct DayPlannerView: View {
                         return (icon, label)
                     },
                     onToggle: { task in toggleTask(task) },
+                    onDetail: { task in detailTask = task },
                     onEdit: { task in editingTask = task },
                     onDelete: { task in deleteTask(task) }
                 )
@@ -346,6 +356,8 @@ struct DayPlannerView: View {
                             linkIcon: linkIcon(for: task),
                             linkLabel: linkLabel(for: task),
                             onToggle: { toggleTask(task) },
+                            onSubtaskToggle: { subtaskId in toggleSubtask(subtaskId, in: task) },
+                            onDetail: { detailTask = task },
                             onEdit: { editingTask = task },
                             onDelete: { deleteTask(task) }
                         )
@@ -495,6 +507,13 @@ struct DayPlannerView: View {
     private func toggleTask(_ task: DailyTask) {
         Task {
             try? await service.toggleTaskCompletion(task)
+        }
+    }
+
+    private func toggleSubtask(_ subtaskId: UUID, in task: DailyTask) {
+        Task {
+            do { try await service.toggleSubtask(subtaskId, in: task) }
+            catch { print("[DayPlannerView] Failed to toggle subtask: \(error)") }
         }
     }
 

@@ -4,6 +4,7 @@ struct ScheduleTimelineView: View {
     let tasks: [DailyTask]
     var linkResolver: ((DailyTask) -> (icon: String, label: String)?)?
     let onToggle: (DailyTask) -> Void
+    let onDetail: (DailyTask) -> Void
     let onEdit: (DailyTask) -> Void
     let onDelete: (DailyTask) -> Void
 
@@ -106,7 +107,7 @@ struct ScheduleTimelineView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .contentShape(RoundedRectangle(cornerRadius: 10))
         .onTapGesture {
-            onEdit(task)
+            onDetail(task)
         }
         .contextMenu {
             Button { onEdit(task) } label: {
@@ -129,6 +130,7 @@ struct ScheduleTimelineView: View {
                 DailyTask(title: "Lunch with client", date: Date(), startTime: Date().addingTimeInterval(3600 * 5), endTime: Date().addingTimeInterval(3600 * 6), isCompleted: true, category: .social)
             ],
             onToggle: { _ in },
+            onDetail: { _ in },
             onEdit: { _ in },
             onDelete: { _ in }
         )

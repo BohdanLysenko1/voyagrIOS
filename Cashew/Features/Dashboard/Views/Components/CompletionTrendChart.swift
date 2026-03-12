@@ -41,14 +41,7 @@ struct CompletionTrendChart: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
             HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(LinearGradient(colors: [.blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    Text("7-Day Trend")
-                        .font(.headline)
-                        .fontWeight(.bold)
-                }
+                SectionHeader(icon: "chart.bar.fill", title: "7-Day Trend", gradient: AppTheme.dayPlannerGradient)
 
                 Spacer()
 
@@ -109,16 +102,16 @@ struct CompletionTrendChart: View {
         if data.total == 0 {
             return LinearGradient(colors: [Color(.systemGray5)], startPoint: .bottom, endPoint: .top)
         }
-        if isToday {
-            return AppTheme.dayPlannerGradient
-        }
         if data.rate >= 1.0 {
+            // All done — success green
             return LinearGradient(colors: [.green, .mint], startPoint: .bottom, endPoint: .top)
         }
-        if data.rate >= 0.5 {
-            return LinearGradient(colors: [.blue.opacity(0.7), .blue], startPoint: .bottom, endPoint: .top)
+        if isToday {
+            // Today highlighted with task blue
+            return AppTheme.dayPlannerGradient
         }
-        return LinearGradient(colors: [.orange.opacity(0.7), .orange], startPoint: .bottom, endPoint: .top)
+        // Partial completion — muted task blue
+        return LinearGradient(colors: [.blue.opacity(0.4), .blue.opacity(0.7)], startPoint: .bottom, endPoint: .top)
     }
 
     private static let dayLabelFormatter: DateFormatter = {

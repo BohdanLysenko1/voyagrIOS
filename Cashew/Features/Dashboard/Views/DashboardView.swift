@@ -283,9 +283,9 @@ struct DashboardView: View {
 
     private var scrollContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // 1. Daily Momentum Header
-                dailyMomentumSection
+            VStack(alignment: .leading, spacing: AppTheme.Space.md) {
+                // 1. Greeting
+                greetingHeader
 
                 // 2. Today's Mission
                 TodaysMissionView(
@@ -293,87 +293,38 @@ struct DashboardView: View {
                     onAddTask: { showAddTask = true }
                 )
 
-                // 3. Plan My Day tile
-                planMyDayTile
+                // 3. Quick Actions
+                quickActionsSection
 
-                // 4. 7-Day Completion Trend
-                CompletionTrendChart(allTasks: dayPlannerService.allTasks)
+                // 4. Progress
+                progressSection
 
-                // 5. Routine Streaks
-                StreakTrackerSection(
-                    routines: dayPlannerService.routines,
-                    allTasks: dayPlannerService.allTasks
-                )
+                // 5. Trip Readiness (only when trips are active)
+                if !upcomingTrips.isEmpty {
+                    TripReadinessSection(trips: upcomingTrips)
+                }
 
-                // 6. Weekly Review Stats
-                WeeklyReviewSection(
-                    allTasks: dayPlannerService.allTasks,
-                    events: eventService.events,
-                    routines: dayPlannerService.routines
-                )
+                // 6. Weekly Insights
+                weeklyInsightsSection
 
-                // 7. Trip Readiness
-                TripReadinessSection(trips: upcomingTrips)
-
-                // 8. Upcoming Events
+                // 7. Upcoming Events
                 if !upcomingEvents.isEmpty {
                     upcomingEventsSection
                 }
 
-                // 9. Smart Alerts
+                // 8. Smart Alerts
                 if !smartAlerts.isEmpty {
                     SmartAlertsSection(alerts: smartAlerts)
                 }
             }
-            .padding()
+            .padding(AppTheme.Space.lg)
         }
     }
 
-    // MARK: - Daily Momentum
+    // MARK: - Greeting Header
 
-    private var dailyMomentumSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Top row: label + level badge
-            HStack {
-                Text("MY DAY")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color("AccentColor"))
-                    .tracking(1.5)
-
-                Spacer()
-
-                // Level badge — tappable
-                Button { showProgress = true } label: {
-                    HStack(spacing: 6) {
-                        Text("⭐️ Lv \(gamification.currentLevel)")
-                            .font(.caption)
-                            .fontWeight(.black)
-                            .foregroundStyle(.white)
-                        Text(gamification.levelTitle)
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white.opacity(0.85))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.purple, Color.indigo],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(Capsule())
-                    .shadow(color: Color.purple.opacity(0.3), radius: 4, x: 0, y: 2)
-                }
-                .buttonStyle(.plain)
-            }
-
-            // Greeting + date
+    private var greetingHeader: some View {
+        HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(greeting)
                     .font(.title2)
@@ -383,97 +334,212 @@ struct DashboardView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Divider()
+            Spacer()
 
-            // Daily progress
-            HStack(spacing: 8) {
-                Image(systemName: completedTasksCount == 0
-                      ? "circle"
-                      : completedTasksCount == todaysTasks.count && !todaysTasks.isEmpty
-                        ? "checkmark.circle.fill"
-                        : "circle.lefthalf.filled")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(completedTasksCount == todaysTasks.count && !todaysTasks.isEmpty
-                                     ? .green : Color("AccentColor"))
+            Button { showProgress = true } label: {
+                HStack(spacing: 6) {
+                    Text("⭐️ Lv \(gamification.currentLevel)")
+                        .font(.caption)
+                        .fontWeight(.black)
+                        .foregroundStyle(.white)
+                    Text(gamification.levelTitle)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white.opacity(0.85))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(AppTheme.gamificationGradient)
+                .clipShape(Capsule())
+                .shadow(color: .purple.opacity(0.3), radius: 4, x: 0, y: 2)
+            }
+            .buttonStyle(.plain)
+        }
+    }
 
-                Text("\(completedTasksCount) / \(todaysTasks.count) tasks completed")
+    // MARK: - Quick Actions
+
+    private var quickActionsSection: some View {
+        VStack(spacing: 10) {
+            planMyDayCard
+            addTaskRow
+        }
+    }
+
+    private var planMyDayCard: some View {
+        Button { showDayPlanner = true } label: {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    colors: [Color(red: 0.15, green: 0.45, blue: 0.95), Color(red: 0.25, green: 0.2, blue: 0.9)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                // Highlight overlay
+                LinearGradient(
+                    colors: [.white.opacity(0.08), .clear],
+                    startPoint: .top,
+                    endPoint: .center
+                )
+
+                HStack(spacing: 16) {
+                    // Icon
+                    ZStack {
+                        Circle()
+                            .fill(.white.opacity(0.15))
+                            .frame(width: 52, height: 52)
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+
+                    // Text
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Plan My Day")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                        Text({
+                            let remaining = todaysTasks.count - completedTasksCount
+                            if todaysTasks.isEmpty { return "Start fresh — add your first task" }
+                            if remaining == 0 { return "All done — review your day" }
+                            return "\(remaining) task\(remaining == 1 ? "" : "s") left to complete"
+                        }())
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.75))
+                    }
+
+                    Spacer()
+
+                    // Arrow
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .padding(10)
+                        .background(.white.opacity(0.15))
+                        .clipShape(Circle())
+                }
+                .padding(.horizontal, AppTheme.cardPadding)
+                .padding(.vertical, 18)
+            }
+        }
+        .buttonStyle(.plain)
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+        .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 5)
+    }
+
+    private var addTaskRow: some View {
+        Button { showAddTask = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(AppTheme.dayPlannerGradient)
+
+                Text("Add Task")
                     .font(.subheadline)
-                    .fontWeight(.medium)
-            }
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
 
-            // XP + streak pills
+                Spacer()
+            }
+            .padding(.horizontal, AppTheme.cardPadding)
+            .padding(.vertical, 14)
+            .background(AppTheme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
+            .shadow(color: AppTheme.cardShadow, radius: AppTheme.cardShadowRadius, x: 0, y: AppTheme.cardShadowY)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Progress
+
+    private var progressSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeader(icon: "chart.bar.fill", title: "Progress", gradient: AppTheme.gamificationGradient)
+
             HStack(spacing: 10) {
-                Label("\(xpToday) XP Today", systemImage: "star.fill")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.orange.gradient)
-                    .clipShape(Capsule())
+                progressStatTile(
+                    value: "\(xpToday)",
+                    unit: "XP",
+                    label: "Today",
+                    icon: "star.fill",
+                    color: .purple
+                )
 
-                Label("\(currentStreak) day\(currentStreak == 1 ? "" : "s") streak", systemImage: "flame.fill")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(currentStreak >= 3
-                                ? Color.red.gradient
-                                : Color(.systemGray3).gradient)
-                    .clipShape(Capsule())
+                progressStatTile(
+                    value: "\(currentStreak)",
+                    unit: "d",
+                    label: "Streak",
+                    icon: "flame.fill",
+                    color: .purple
+                )
+
+                Button { showProgress = true } label: {
+                    progressStatTile(
+                        value: "Lv \(gamification.currentLevel)",
+                        unit: "",
+                        label: gamification.levelTitle,
+                        icon: "trophy.fill",
+                        color: .purple
+                    )
+                }
+                .buttonStyle(.plain)
             }
 
-            // XP progress bar
             xpProgressBar
         }
         .padding(AppTheme.cardPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [Color("AccentColor").opacity(0.15), Color("AccentColor").opacity(0.05)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(AppTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
         .shadow(color: AppTheme.cardShadow, radius: AppTheme.cardShadowRadius, x: 0, y: AppTheme.cardShadowY)
+    }
+
+    private func progressStatTile(value: String, unit: String, label: String, icon: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .lastTextBaseline, spacing: 2) {
+                Text(value)
+                    .font(.title3)
+                    .fontWeight(.black)
+                    .monospacedDigit()
+                if !unit.isEmpty {
+                    Text(unit)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(AppTheme.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color.opacity(AppTheme.statTileBackgroundOpacity))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.statTileCornerRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppTheme.statTileCornerRadius)
+                .stroke(color.opacity(AppTheme.statTileBorderOpacity), lineWidth: 1)
+        )
     }
 
     // MARK: - XP Progress Bar
 
     private var xpProgressBar: some View {
         VStack(alignment: .leading, spacing: 5) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color("AccentColor").opacity(0.15))
-                        .frame(height: 6)
-
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color("AccentColor"), Color("AccentColor").opacity(0.7)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: geo.size.width * gamification.levelProgress, height: 6)
-                        .animation(.spring(response: 0.5), value: gamification.levelProgress)
-                }
-            }
-            .frame(height: 6)
+            AppProgressBar(progress: gamification.levelProgress, color: .purple)
 
             HStack {
-                Text("\(gamification.totalXP) XP total")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
                 Spacer()
                 if gamification.isMaxLevel {
                     Text("Max Level")
                         .font(.caption2)
                         .fontWeight(.semibold)
-                        .foregroundStyle(Color("AccentColor"))
+                        .foregroundStyle(.purple)
                 } else {
                     Text("\(gamification.xpToNextLevel) XP to Level \(gamification.currentLevel + 1)")
                         .font(.caption2)
@@ -483,69 +549,25 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Plan My Day Tile
+    // MARK: - Weekly Insights
 
-    private var planMyDayTile: some View {
-        Button {
-            showDayPlanner = true
-        } label: {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(AppTheme.dayPlannerGradient)
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
+    private var weeklyInsightsSection: some View {
+        VStack(spacing: 16) {
+            CompletionTrendChart(allTasks: dayPlannerService.allTasks)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Plan My Day")
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.primary)
-
-                    let remaining = todaysTasks.count - completedTasksCount
-                    Text(todaysTasks.isEmpty
-                         ? "Set up tasks, routines & schedule"
-                         : "\(remaining) task\(remaining == 1 ? "" : "s") remaining · Tap to manage")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(AppTheme.cardPadding)
-            .background(
-                LinearGradient(
-                    colors: [Color.green.opacity(0.1), Color.mint.opacity(0.05)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
+            WeeklyReviewSection(
+                allTasks: dayPlannerService.allTasks,
+                events: eventService.events,
+                routines: dayPlannerService.routines
             )
-            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius))
-            .shadow(color: AppTheme.cardShadow, radius: AppTheme.cardShadowRadius, x: 0, y: AppTheme.cardShadowY)
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Upcoming Events
 
     private var upcomingEventsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "star.circle.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(AppTheme.eventGradient)
-                Text("Upcoming Events")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                Spacer()
-            }
+            SectionHeader(icon: "star.circle.fill", title: "Upcoming Events", gradient: AppTheme.eventGradient)
 
             ForEach(upcomingEvents) { event in
                 NavigationLink(value: event.id) {

@@ -108,6 +108,56 @@ final class DayPlannerService: DayPlannerServiceProtocol {
         }
     }
 
+    // MARK: - Subtask Operations
+
+    func toggleSubtask(_ subtaskId: UUID, in task: DailyTask) async throws {
+        guard let taskIndex = allTasks.firstIndex(where: { $0.id == task.id }),
+              let subtaskIndex = allTasks[taskIndex].subtasks.firstIndex(where: { $0.id == subtaskId })
+        else { return }
+
+        let wasCompleting = !allTasks[taskIndex].subtasks[subtaskIndex].isCompleted
+        allTasks[taskIndex].subtasks[subtaskIndex].isCompleted = wasCompleting
+
+        // Award/deduct subtask XP
+        if let gam = gamificationService {
+            let streak = maxCurrentStreak()
+            if wasCompleting {
+                gam.award(xp: XPCalculator.subtaskXP, streakDays: streak)
+            } else {
+                gam.deduct(xp: XPCalculator.subtaskXP, streakDays: streak)
+            }
+        }
+
+        // Auto-complete parent when all subtasks done
+        let allDone = allTasks[taskIndex].allSubtasksCompleted
+        let parentWasCompleted = task.isCompleted
+        if allDone && !parentWasCompleted {
+            allTasks[taskIndex].isCompleted = true
+            if let gam = gamificationService {
+                gam.award(xp: XPCalculator.subtaskCompletionBonus, streakDays: maxCurrentStreak())
+            }
+        } else if !allDone && parentWasCompleted {
+            allTasks[taskIndex].isCompleted = false
+            if let gam = gamificationService {
+                gam.deduct(xp: XPCalculator.subtaskCompletionBonus, streakDays: maxCurrentStreak())
+            }
+        }
+
+        try await updateTask(allTasks[taskIndex])
+    }
+
+    func addSubtask(title: String, to task: DailyTask) async throws {
+        guard let index = allTasks.firstIndex(where: { $0.id == task.id }) else { return }
+        allTasks[index].subtasks.append(Subtask(title: title))
+        try await updateTask(allTasks[index])
+    }
+
+    func deleteSubtask(_ subtaskId: UUID, from task: DailyTask) async throws {
+        guard let index = allTasks.firstIndex(where: { $0.id == task.id }) else { return }
+        allTasks[index].subtasks.removeAll { $0.id == subtaskId }
+        try await updateTask(allTasks[index])
+    }
+
     // MARK: - Routine CRUD
 
     func createRoutine(_ routine: DailyRoutine) async throws {

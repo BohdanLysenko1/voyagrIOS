@@ -15,6 +15,10 @@ protocol DayPlannerServiceProtocol: AnyObject {
     func deleteTask(by id: UUID) async throws
     func toggleTaskCompletion(_ task: DailyTask) async throws
 
+    func toggleSubtask(_ subtaskId: UUID, in task: DailyTask) async throws
+    func addSubtask(title: String, to task: DailyTask) async throws
+    func deleteSubtask(_ subtaskId: UUID, from task: DailyTask) async throws
+
     func createRoutine(_ routine: DailyRoutine) async throws
     func updateRoutine(_ routine: DailyRoutine) async throws
     func deleteRoutine(by id: UUID) async throws

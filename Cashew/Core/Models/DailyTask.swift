@@ -13,6 +13,7 @@ struct DailyTask: Identifiable, Codable, Equatable, Sendable {
     var routineId: UUID?
     var tripId: UUID?
     var eventId: UUID?
+    var subtasks: [Subtask]
     let createdAt: Date
     var updatedAt: Date
 
@@ -29,6 +30,7 @@ struct DailyTask: Identifiable, Codable, Equatable, Sendable {
         routineId: UUID? = nil,
         tripId: UUID? = nil,
         eventId: UUID? = nil,
+        subtasks: [Subtask] = [],
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -44,6 +46,7 @@ struct DailyTask: Identifiable, Codable, Equatable, Sendable {
         self.routineId = routineId
         self.tripId = tripId
         self.eventId = eventId
+        self.subtasks = subtasks
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -52,7 +55,7 @@ struct DailyTask: Identifiable, Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, date, startTime, endTime, isCompleted
-        case category, customCategoryName, notes, routineId, tripId, eventId, createdAt, updatedAt
+        case category, customCategoryName, notes, routineId, tripId, eventId, subtasks, createdAt, updatedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -72,9 +75,19 @@ struct DailyTask: Identifiable, Codable, Equatable, Sendable {
         routineId = try container.decodeIfPresent(UUID.self, forKey: .routineId)
         tripId = try container.decodeIfPresent(UUID.self, forKey: .tripId)
         eventId = try container.decodeIfPresent(UUID.self, forKey: .eventId)
+        subtasks = try container.decodeIfPresent([Subtask].self, forKey: .subtasks) ?? []
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
     }
+
+    // MARK: - Computed Properties
+
+    // MARK: - Subtask Helpers
+
+    var hasSubtasks: Bool { !subtasks.isEmpty }
+    var completedSubtaskCount: Int { subtasks.filter(\.isCompleted).count }
+    var allSubtasksCompleted: Bool { !subtasks.isEmpty && subtasks.allSatisfy(\.isCompleted) }
+    var subtaskProgress: String { "\(completedSubtaskCount)/\(subtasks.count)" }
 
     // MARK: - Computed Properties
 
